@@ -1,70 +1,171 @@
-# Getting Started with Create React App
+# Montra - Financial Clarity Dashboard
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+**Montra** – The mantra for financial clarity: monitor your cash flow, track investments, and understand your complete financial picture.
+
+## About Montra
+
+Montra is a comprehensive financial management dashboard built with React that helps you track your finances with ease. Monitor multiple accounts, visualize your spending patterns, and make informed financial decisions.
+
+## Features
+
+✨ **Dashboard**
+- View total balance at a glance
+- Quick summary of accounts, wallets, and savings
+- Latest transactions feed
+- Visual expense distribution with pie charts
+
+💳 **Account Management**
+- Add, edit, and delete multiple accounts
+- Support for different account types (Wallet, Savings, Credit, Investments)
+- Hide/show balance for security
+- Quick account overview on dashboard
+
+📊 **Analytics**
+- Pie chart showing distribution of funds
+- Bar graph displaying account hierarchy
+- Detailed wallet breakdown with percentages
+- Visual insights into your financial portfolio
+
+📝 **Transaction History**
+- Complete transaction log with timestamps
+- Track all account activities (additions, deletions, balance adjustments)
+- Clear all transaction history if needed
+- Transaction filtering by account and type
+
+📱 **Responsive Design**
+- Fully responsive layout for mobile, tablet, and desktop
+- Sticky header for easy navigation while scrolling
+- Mobile-optimized sidebar navigation
+- Touch-friendly interface elements
+
+💾 **Data Management**
+- Save and load wallet states
+- Export financial data as JSON backup
+- Import previously saved data
+- Local storage for persistent data
+
+## Getting Started
+
+### Prerequisites
+- Node.js (v14 or higher)
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/ChristianDeoManlangit/Montra-Financial-Site.git
+cd Montra-Financial-Site
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
+```bash
+npm start
+```
+
+4. Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
 ## Available Scripts
 
-In the project directory, you can run:
-
 ### `npm start`
-
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Runs the app in development mode. The page will reload when you make changes.
 
 ### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Launches the test runner in interactive watch mode.
 
 ### `npm run build`
+Builds the app for production to the `build` folder.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Technology Stack
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- **React** - UI framework
+- **Tailwind CSS** - Styling
+- **Recharts** - Data visualization (pie charts, bar graphs)
+- **Lucide React** - Icon library
+- **LocalStorage** - Data persistence
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Project Structure
 
-### `npm run eject`
+```
+src/
+├── App.js           # Main application component
+├── App.css          # Application styles
+├── index.js         # React entry point
+└── index.css        # Global styles
+public/
+├── index.html       # HTML template
+├── logo.png         # Montra logo
+└── manifest.json    # PWA manifest
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Usage
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Adding an Account
+1. Click the "Add Account" button
+2. Enter account details (name, type, initial balance, icon)
+3. Click "Add Account" to create it
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Viewing Analytics
+- Go to the Analytics tab to see pie chart and bar graph distributions
+- View detailed breakdown of each account's balance and percentage
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Managing Transactions
+- View all transactions in the Transaction History tab
+- Clear transaction history with the "Remove All Records" button
 
-## Learn More
+### Backing Up Data
+- Use "Export Data" to download a JSON backup of your wallets
+- Use "Import Data" to restore a previously saved backup
+- Use "Manage States" to save and load wallet snapshots
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Features in Detail
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Dashboard
+The main landing page shows:
+- Total balance overview with visibility toggle
+- Quick stats: Number of accounts, total wallets, total savings
+- Your top 3 accounts with "View All" option
+- Latest 4 transactions
+- Expense distribution pie chart
 
-### Code Splitting
+### Responsive Breakpoints
+- **Mobile (<768px)**: Full-screen sidebar, 2-column summary grid with menu card
+- **Tablet (768px-1024px)**: Full-screen sidebar with menu toggle, responsive layouts
+- **Desktop (>1024px)**: Fixed sidebar, full dashboard view with all features
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Data Storage
 
-### Analyzing the Bundle Size
+All data is stored locally in your browser using localStorage:
+- `wallets` - Your account data
+- `savedStates` - Saved wallet configurations
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Your financial data never leaves your device!
 
-### Making a Progressive Web App
+## Browser Support
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Montra works best on modern browsers:
+- Chrome/Edge (latest)
+- Firefox (latest)
+- Safari (latest)
+- Mobile browsers (iOS Safari, Chrome Mobile)
 
-### Advanced Configuration
+## Contributing
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Contributions are welcome! Feel free to submit issues and enhancement requests.
 
-### Deployment
+## License
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+This project is open source and available under the MIT License.
 
-### `npm run build` fails to minify
+## Feedback & Support
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+For feedback, bug reports, or feature requests, please open an issue on the [GitHub repository](https://github.com/ChristianDeoManlangit/Montra-Financial-Site).
+
+---
+
+**Start managing your finances with Montra today!** 💰
