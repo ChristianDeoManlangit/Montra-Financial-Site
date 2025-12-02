@@ -26,10 +26,11 @@ import {
   Upload,
   Menu,
   ReceiptText,
-  Bell,
   Settings,
   User,
   ArrowRight,
+  Trash,
+  AlertCircle,
 } from "lucide-react";
 
 const COLORS = [
@@ -95,14 +96,47 @@ style.textContent = `
 document.head.appendChild(style);
 
 const WalletTracker = () => {
-  const [wallets, setWallets] = useState([]);
+  // Initialize state with data from localStorage immediately (before render)
+  const [wallets, setWallets] = useState(() => {
+    try {
+      const saved = localStorage.getItem("montra_wallets");
+      console.log("🔄 Initial wallet load from localStorage:", saved);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("❌ Failed to load wallets:", e);
+      return [];
+    }
+  });
+
+  const [transactions, setTransactions] = useState(() => {
+    try {
+      const saved = localStorage.getItem("montra_transactions");
+      console.log("🔄 Initial transaction load from localStorage:", saved);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("❌ Failed to load transactions:", e);
+      return [];
+    }
+  });
+
+  const [savedStates, setSavedStates] = useState(() => {
+    try {
+      const saved = localStorage.getItem("montra_savedStates");
+      console.log("🔄 Initial states load from localStorage:", saved);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("❌ Failed to load states:", e);
+      return [];
+    }
+  });
+
   const [showBalances, setShowBalances] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSaveLoadModal, setShowSaveLoadModal] = useState(false);
   const [editingWallet, setEditingWallet] = useState(null);
-  const [filter, setFilter] = useState("All");
+  const [analyticsFilter, setAnalyticsFilter] = useState("All");
+  const [accountsFilter, setAccountsFilter] = useState("All");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [savedStates, setSavedStates] = useState([]);
   const [stateName, setStateName] = useState("");
   const [newWallet, setNewWallet] = useState({
     name: "",
@@ -111,27 +145,70 @@ const WalletTracker = () => {
     icon: "💳",
   });
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [transactions, setTransactions] = useState([]);
+  const [confirmModal, setConfirmModal] = useState({ show: false, action: null, targetId: null, message: "", title: "" });
 
   const icons = ["💳", "🏦", "💵", "💰", "📱", "🎯", "💎", "🏪", "🎨", "⭐"];
 
+  // Save to localStorage IMMEDIATELY whenever wallets change
   useEffect(() => {
-    const saved = localStorage.getItem("wallets");
-    if (saved) {
-      setWallets(JSON.parse(saved));
+    try {
+      localStorage.setItem("montra_wallets", JSON.stringify(wallets));
+      console.log("✅ Wallets saved to localStorage:", wallets.length, "items");
+    } catch (e) {
+      console.error("❌ Failed to save wallets:", e);
     }
-    const states = localStorage.getItem("savedStates");
-    if (states) {
-      setSavedStates(JSON.parse(states));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("wallets", JSON.stringify(wallets));
   }, [wallets]);
 
+  // Save to localStorage IMMEDIATELY whenever transactions change
+  useEffect(() => {
+    try {
+      localStorage.setItem("montra_transactions", JSON.stringify(transactions));
+      console.log("✅ Transactions saved to localStorage:", transactions.length, "items");
+    } catch (e) {
+      console.error("❌ Failed to save transactions:", e);
+    }
+  }, [transactions]);
+
+  // Save to localStorage IMMEDIATELY whenever states change
+  useEffect(() => {
+    try {
+      localStorage.setItem("montra_savedStates", JSON.stringify(savedStates));
+      console.log("✅ States saved to localStorage:", savedStates.length, "items");
+    } catch (e) {
+      console.error("❌ Failed to save states:", e);
+    }
+  }, [savedStates]);
+
+  // Debug function
+  const debugStorage = () => {
+    const walletsData = localStorage.getItem("montra_wallets");
+    const transactionsData = localStorage.getItem("montra_transactions");
+    const statesData = localStorage.getItem("montra_savedStates");
+    
+    console.log("📊 === STORAGE DEBUG ===");
+    console.log("📊 Raw wallets in localStorage:", walletsData);
+    console.log("📊 Raw transactions in localStorage:", transactionsData);
+    console.log("📊 Raw states in localStorage:", statesData);
+    console.log("📊 Current state wallets:", wallets);
+    console.log("📊 Current state transactions:", transactions);
+    console.log("📊 Current state savedStates:", savedStates);
+    
+    alert(`📊 STORAGE DEBUG:\n\nWallets: ${wallets.length} items\nTransactions: ${transactions.length} items\nStates: ${savedStates.length} items\n\n✅ Check console (F12) for detailed info`);
+  };
+
   const totalNetWorth = wallets.reduce((sum, wallet) => sum + wallet.balance, 0);
-  const pieData = wallets.map((wallet) => ({
+  
+  const getFilteredWallets = () => {
+    if (analyticsFilter === "All") return wallets;
+    if (analyticsFilter === "Wallets") return wallets.filter(w => w.type === "Wallet");
+    if (analyticsFilter === "Loans") return wallets.filter(w => w.type === "Loan");
+    if (analyticsFilter === "Credit") return wallets.filter(w => w.type === "Credit");
+    if (analyticsFilter === "Investments") return wallets.filter(w => w.type === "Investments");
+    return wallets;
+  };
+
+  const filteredWalletsForAnalytics = getFilteredWallets();
+  const pieData = filteredWalletsForAnalytics.map((wallet) => ({
     name: wallet.name,
     value: wallet.balance,
     color: wallet.color,
@@ -174,6 +251,17 @@ const WalletTracker = () => {
       }]);
     }
     setWallets(wallets.filter((w) => w.id !== id));
+    setConfirmModal({ show: false, action: null, targetId: null, message: "", title: "" });
+  };
+
+  const handleDeleteTransaction = (id) => {
+    setTransactions(transactions.filter(t => t.id !== id));
+    setConfirmModal({ show: false, action: null, targetId: null, message: "", title: "" });
+  };
+
+  const handleRemoveAllTransactions = () => {
+    setTransactions([]);
+    setConfirmModal({ show: false, action: null, targetId: null, message: "", title: "" });
   };
 
   const handleUpdateBalance = (id, newBalance) => {
@@ -199,33 +287,35 @@ const WalletTracker = () => {
         id: Date.now(),
         name: stateName,
         wallets: wallets,
+        transactions: transactions,
         date: new Date().toISOString(),
       };
       const updatedStates = [...savedStates, newState];
       setSavedStates(updatedStates);
-      localStorage.setItem("savedStates", JSON.stringify(updatedStates));
       setStateName("");
     }
   };
 
   const handleLoadState = (state) => {
     setWallets(state.wallets);
+    if (state.transactions) {
+      setTransactions(state.transactions);
+    }
     setShowSaveLoadModal(false);
   };
 
   const handleDeleteState = (id) => {
     const updatedStates = savedStates.filter((s) => s.id !== id);
     setSavedStates(updatedStates);
-    localStorage.setItem("savedStates", JSON.stringify(updatedStates));
   };
 
   const handleExportData = () => {
-    const data = { wallets, exportDate: new Date().toISOString() };
+    const data = { wallets, transactions, exportDate: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `wallet-backup-${Date.now()}.json`;
+    a.download = `montra-backup-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -240,11 +330,24 @@ const WalletTracker = () => {
           if (data.wallets) {
             setWallets(data.wallets);
           }
+          if (data.transactions) {
+            setTransactions(data.transactions);
+          }
         } catch (error) {
           alert("Invalid file format");
         }
       };
       reader.readAsText(file);
+    }
+  };
+
+  const handleConfirmAction = () => {
+    if (confirmModal.action === "deleteWallet") {
+      handleDeleteWallet(confirmModal.targetId);
+    } else if (confirmModal.action === "deleteTransaction") {
+      handleDeleteTransaction(confirmModal.targetId);
+    } else if (confirmModal.action === "removeAllTransactions") {
+      handleRemoveAllTransactions();
     }
   };
 
@@ -325,16 +428,16 @@ const WalletTracker = () => {
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 flex flex-col">
         {/* Top Header */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 p-6 flex justify-between items-center animate-fadeIn">
+        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 p-3 sm:p-6 flex justify-between items-center animate-fadeIn">
           <div className="flex items-center gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-[#1E1E1E]">
+              <h2 className="text-lg sm:text-2xl font-bold text-[#1E1E1E]">
                 {activeTab === "dashboard" && "Dashboard"}
                 {activeTab === "accounts" && "Accounts"}
                 {activeTab === "analytics" && "Analytics"}
                 {activeTab === "transaction" && "Transaction History"}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs sm:text-sm text-gray-500">
                 {activeTab === "dashboard" && "Manage your finances"}
                 {activeTab === "accounts" && "View and manage all your accounts"}
                 {activeTab === "analytics" && "Visualize your financial data"}
@@ -358,13 +461,11 @@ const WalletTracker = () => {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-3 sm:p-6">
           <div className="max-w-7xl mx-auto">
             {activeTab === "dashboard" && (
-              <div className="space-y-6 animate-fadeIn">
-                {/* 3 Summary Cards Row - 2x2 grid on mobile, single row on desktop */}
-                <div className="flex flex-col gap-6">
-                  {/* Top Balance Card - Full width on desktop, takes one slot on mobile */}
+              <div className="space-y-3 sm:space-y-6 animate-fadeIn">
+                <div className="space-y-3 sm:space-y-6">
                   <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 lg:col-span-4">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-4">
@@ -382,40 +483,36 @@ const WalletTracker = () => {
                     </div>
                   </div>
 
-                  {/* Three summary cards - 2x2 grid on mobile, 3 columns on desktop */}
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-                      <div className="p-3 bg-green-100 rounded-lg w-fit mb-3">
-                        <TrendingUp className="text-green-600" size={24} />
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-1.5 sm:gap-3 lg:gap-6">
+                    <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200">
+                      <div className="p-1 sm:p-2 lg:p-3 bg-green-100 rounded-lg w-fit mb-1 sm:mb-3 lg:mb-3">
+                        <TrendingUp className="text-green-600" size={14} />
                       </div>
-                      <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">Accounts</p>
-                      <h3 className="text-xl sm:text-2xl font-bold text-[#1E1E1E]">{wallets.length}</h3>
+                      <p className="text-xs text-gray-500 font-medium mb-0.5">Accounts</p>
+                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E]">{wallets.length}</h3>
                     </div>
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-                      <div className="p-3 bg-purple-100 rounded-lg w-fit mb-3">
-                        <CreditCard className="text-purple-600" size={24} />
+                    <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200">
+                      <div className="p-1 sm:p-2 lg:p-3 bg-purple-100 rounded-lg w-fit mb-1 sm:mb-3 lg:mb-3">
+                        <CreditCard className="text-purple-600" size={14} />
                       </div>
-                      <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">Wallets</p>
-                      <h3 className="text-xl sm:text-2xl font-bold text-[#1E1E1E] truncate">{showBalances ? `₱${wallets.filter(w => w.type === "Wallet").reduce((sum, w) => sum + w.balance, 0).toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••••"}</h3>
+                      <p className="text-xs text-gray-500 font-medium mb-0.5">Wallets</p>
+                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E] truncate">{showBalances ? `₱${wallets.filter(w => w.type === "Wallet").reduce((sum, w) => sum + w.balance, 0).toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••••"}</h3>
                     </div>
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-                      <div className="p-3 bg-orange-100 rounded-lg w-fit mb-3">
-                        <CreditCard className="text-orange-600" size={24} />
+                    <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200">
+                      <div className="p-1 sm:p-2 lg:p-3 bg-orange-100 rounded-lg w-fit mb-1 sm:mb-3 lg:mb-3">
+                        <CreditCard className="text-orange-600" size={14} />
                       </div>
-                      <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1">Savings</p>
-                      <h3 className="text-xl sm:text-2xl font-bold text-[#1E1E1E] truncate">{showBalances ? `₱${wallets.filter(w => w.type === "Savings").reduce((sum, w) => sum + w.balance, 0).toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••••"}</h3>
+                      <p className="text-xs text-gray-500 font-medium mb-0.5">Loans</p>
+                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E] truncate">{showBalances ? `₱${wallets.filter(w => w.type === "Loan").reduce((sum, w) => sum + w.balance, 0).toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••••"}</h3>
                     </div>
-                    {/* View More card - only visible on mobile/tablet */}
-                    <button onClick={() => setSidebarOpen(true)} className="lg:hidden flex flex-col items-center justify-center border-2 border-dashed border-indigo-300 rounded-2xl p-6 hover:bg-indigo-50 transition-all bg-white shadow-sm">
-                      <span className="text-3xl text-indigo-500 mb-2">☰</span>
-                      <span className="text-indigo-600 font-semibold text-center">More</span>
+                    <button onClick={() => setSidebarOpen(true)} className="lg:hidden flex flex-col items-center justify-center border-2 border-dashed border-indigo-300 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 hover:bg-indigo-50 transition-all bg-white shadow-sm">
+                      <span className="text-lg sm:text-2xl lg:text-3xl text-indigo-500 mb-0.5">☰</span>
+                      <span className="text-indigo-600 font-semibold text-center text-xs">More</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Your Accounts & Transactions Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Your Accounts */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
                   <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-bold text-[#1E1E1E]">Your Accounts</h3>
@@ -446,7 +543,6 @@ const WalletTracker = () => {
                     )}
                   </div>
 
-                  {/* Latest Transactions */}
                   <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-bold text-[#1E1E1E]">Latest Transactions</h3>
@@ -478,7 +574,6 @@ const WalletTracker = () => {
                   </div>
                 </div>
 
-                {/* Analytics Card */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold text-[#1E1E1E]">All Expenses</h3>
@@ -493,8 +588,8 @@ const WalletTracker = () => {
                       <div className="flex-1 flex flex-col items-center">
                         <ResponsiveContainer width="100%" height={250}>
                           <PieChart tabIndex={-1}>
-                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} fill="#8884d8" dataKey="value" paddingAngle={2}>
-                              {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                            <Pie data={wallets.map(w => ({ name: w.name, value: w.balance, color: w.color }))} cx="50%" cy="50%" innerRadius={70} outerRadius={100} fill="#8884d8" dataKey="value" paddingAngle={2}>
+                              {wallets.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                             </Pie>
                             <Tooltip formatter={(value) => `₱${value.toLocaleString("en-US", {minimumFractionDigits: 2})}`} />
                           </PieChart>
@@ -509,7 +604,7 @@ const WalletTracker = () => {
                               <span className="text-[#1E1E1E] font-medium">{wallet.name}</span>
                             </div>
                             <span className="text-gray-600">₱{wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
-                            <span className="text-gray-400">{((wallet.balance / totalNetWorth) * 100).toFixed(1)}%</span>
+                            <span className="text-gray-400">{totalNetWorth > 0 ? ((wallet.balance / totalNetWorth) * 100).toFixed(1) : 0}%</span>
                           </div>
                         ))}
                         <div className="pt-2 border-t border-gray-200 flex justify-between font-bold text-[#1E1E1E]">
@@ -525,23 +620,45 @@ const WalletTracker = () => {
 
             {activeTab === "accounts" && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 animate-fadeIn">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-row justify-between items-center gap-4 mb-6">
                   <h3 className="text-xl font-bold text-[#1E1E1E]">All Accounts</h3>
-                  <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                  <button onClick={() => setShowAddModal(true)} className="hidden sm:flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
                     <Plus size={20} /> Add Account
                   </button>
+                  <button onClick={() => setShowAddModal(true)} className="sm:hidden flex items-center justify-center p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                    <Plus size={20} />
+                  </button>
                 </div>
+
+                {wallets.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {["All", "Wallet", "Loan", "Credit", "Investments"].map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setAccountsFilter(type)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                          accountsFilter === type
+                            ? "bg-indigo-600 text-white"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {wallets.length === 0 ? (
                   <p className="text-center text-gray-400 py-12">No accounts yet</p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {wallets.map((wallet, index) => (
+                    {(accountsFilter === "All" ? wallets : wallets.filter(w => w.type === accountsFilter)).map((wallet, index) => (
                       <div key={wallet.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-lg transition-all" style={{animationDelay: `${index * 50}ms`}}>
                         <div className="flex justify-between items-start mb-3">
                           <span className="text-3xl">{wallet.icon}</span>
                           <div className="flex gap-1">
                             <button onClick={() => setEditingWallet(wallet.id)} className="p-1 bg-white hover:bg-gray-100 rounded"><Edit2 size={14} /></button>
-                            <button onClick={() => handleDeleteWallet(wallet.id)} className="p-1 bg-white hover:bg-red-50 text-red-600 rounded"><Trash2 size={14} /></button>
+                            <button onClick={() => setConfirmModal({ show: true, action: "deleteWallet", targetId: wallet.id, message: `Are you sure you want to delete "${wallet.name}"? This action cannot be undone.`, title: "Delete Account" })} className="p-1 bg-white hover:bg-red-50 text-red-600 rounded"><Trash2 size={14} /></button>
                           </div>
                         </div>
                         <h4 className="font-semibold text-[#1E1E1E] mb-1">{wallet.name}</h4>
@@ -563,10 +680,26 @@ const WalletTracker = () => {
 
             {activeTab === "analytics" && (
               <div className="space-y-6 animate-fadeIn">
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {["All", "Wallets", "Loans", "Credit", "Investments"].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setAnalyticsFilter(type)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                        analyticsFilter === type
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-lg font-bold text-[#1E1E1E] mb-4">Pie Distribution</h3>
-                  {wallets.length === 0 ? (
-                    <p className="text-center text-gray-400 py-12">No data</p>
+                  {filteredWalletsForAnalytics.length === 0 ? (
+                    <p className="text-center text-gray-400 py-12">No data for selected filter</p>
                   ) : (
                     <div className="flex flex-col lg:flex-row gap-8 lg:items-center">
                       <div className="flex-1 flex flex-col items-center">
@@ -580,38 +713,45 @@ const WalletTracker = () => {
                         </ResponsiveContainer>
                         <p className="text-sm text-gray-500 font-medium mt-2">Distribution of Funds</p>
                       </div>
-                      <div className="flex-1 space-y-2 max-h-80 overflow-y-auto">
-                        {wallets.map((wallet) => (
-                          <div key={wallet.id} className="flex justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{backgroundColor: wallet.color}} />
-                              <span className="text-[#1E1E1E] font-medium">{wallet.name}</span>
+                      <div className="flex-1">
+                        <div className="space-y-2 max-h-80 overflow-y-auto">
+                          {filteredWalletsForAnalytics.map((wallet) => (
+                            <div key={wallet.id} className="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{backgroundColor: wallet.color}} />
+                                <span className="text-[#1E1E1E] font-medium">{wallet.name}</span>
+                              </div>
+                              <div className="flex gap-4 items-center">
+                                <span className="text-gray-600">₱{wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+                                <span className="text-gray-400 w-12 text-right">{filteredWalletsForAnalytics.reduce((sum, w) => sum + w.balance, 0) > 0 ? ((wallet.balance / filteredWalletsForAnalytics.reduce((sum, w) => sum + w.balance, 0)) * 100).toFixed(1) : 0}%</span>
+                              </div>
                             </div>
-                            <span className="text-gray-600">₱{wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
-                            <span className="text-gray-400">{((wallet.balance / totalNetWorth) * 100).toFixed(1)}%</span>
+                          ))}
+                          <div className="pt-2 border-t border-gray-200 flex justify-between font-bold text-[#1E1E1E] p-2">
+                            <span>Total</span>
+                            <span>₱{filteredWalletsForAnalytics.reduce((sum, w) => sum + w.balance, 0).toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
                           </div>
-                        ))}
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Bar Chart Card */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-lg font-bold text-[#1E1E1E] mb-4">Bar Graph Distribution</h3>
-                  {wallets.length === 0 ? (
-                    <p className="text-center text-gray-400 py-12">No data</p>
+                  {filteredWalletsForAnalytics.length === 0 ? (
+                    <p className="text-center text-gray-400 py-12">No data for selected filter</p>
                   ) : (
                     <div className="flex flex-col lg:flex-row gap-8 lg:items-center">
                       <div className="flex-1 flex flex-col items-center">
                         <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={wallets} margin={{ top: 20, right: 10, left: 0, bottom: 60 }}>
+                          <BarChart data={filteredWalletsForAnalytics} margin={{ top: 20, right: 10, left: 0, bottom: 60 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                             <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
                             <YAxis tick={{ fontSize: 12 }} />
                             <Tooltip formatter={(value) => `₱${value.toLocaleString("en-US", {minimumFractionDigits: 2})}`} />
                             <Bar dataKey="balance" radius={[8, 8, 0, 0]} fill="#6366f1">
-                              {wallets.map((wallet, index) => (
+                              {filteredWalletsForAnalytics.map((wallet, index) => (
                                 <Cell key={`cell-${index}`} fill={wallet.color} />
                               ))}
                             </Bar>
@@ -619,10 +759,10 @@ const WalletTracker = () => {
                         </ResponsiveContainer>
                         <p className="text-sm text-gray-500 font-medium mt-2">Hierarchy of Funds</p>
                       </div>
-                      <div className="flex-1 flex flex-col items-center">
-                        <div className="w-full space-y-2 max-h-80 overflow-y-auto">
-                          {wallets.map((wallet) => (
-                            <div key={wallet.id} className="flex justify-between text-sm">
+                      <div className="flex-1">
+                        <div className="space-y-2 max-h-80 overflow-y-auto">
+                          {filteredWalletsForAnalytics.map((wallet) => (
+                            <div key={wallet.id} className="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded">
                               <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full" style={{backgroundColor: wallet.color}} />
                                 <span className="text-[#1E1E1E] font-medium">{wallet.name}</span>
@@ -630,9 +770,9 @@ const WalletTracker = () => {
                               <span className="text-gray-600">₱{wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
                             </div>
                           ))}
-                          <div className="pt-2 border-t border-gray-200 flex justify-between font-bold text-[#1E1E1E]">
+                          <div className="pt-2 border-t border-gray-200 flex justify-between font-bold text-[#1E1E1E] p-2">
                             <span>Total</span>
-                            <span>₱{totalNetWorth.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+                            <span>₱{filteredWalletsForAnalytics.reduce((sum, w) => sum + w.balance, 0).toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
                           </div>
                         </div>
                       </div>
@@ -651,19 +791,24 @@ const WalletTracker = () => {
                   <>
                     <div className="space-y-3 mb-6">
                       {transactions.slice().reverse().map((tx) => (
-                        <div key={tx.id} className="flex items-center justify-between p-3 border-b border-gray-100">
-                          <div className="flex items-center gap-3">
+                        <div key={tx.id} className="flex items-center justify-between p-3 border-b border-gray-100 group">
+                          <div className="flex items-center gap-3 flex-1">
                             <span className="text-2xl">{tx.icon}</span>
                             <div>
                               <p className="font-semibold text-[#1E1E1E]">{tx.type} ({tx.walletName})</p>
                               <p className="text-xs text-gray-500">{new Date(tx.date).toLocaleString()}</p>
                             </div>
                           </div>
-                          <p className={`font-bold ${tx.amount > 0 ? "text-green-600" : "text-red-600"}`}>{tx.amount > 0 ? "+" : "-"}₱{Math.abs(tx.amount).toLocaleString("en-US", {minimumFractionDigits: 2})}</p>
+                          <div className="flex items-center gap-3">
+                            <p className={`font-bold ${tx.amount > 0 ? "text-green-600" : "text-red-600"}`}>{tx.amount > 0 ? "+" : "-"}₱{Math.abs(tx.amount).toLocaleString("en-US", {minimumFractionDigits: 2})}</p>
+                            <button onClick={() => setConfirmModal({ show: true, action: "deleteTransaction", targetId: tx.id, message: "Are you sure you want to remove this transaction?", title: "Delete Transaction" })} className="p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 text-red-600 rounded">
+                              <Trash size={16} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
-                    <button onClick={() => { if (window.confirm("Are you sure you want to remove all transaction history?")) { setTransactions([]); } }} className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all">
+                    <button onClick={() => setConfirmModal({ show: true, action: "removeAllTransactions", targetId: null, message: "Are you sure you want to remove all transaction history? This action cannot be undone.", title: "Clear All Transactions" })} className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all">
                       Remove All Records
                     </button>
                   </>
@@ -674,7 +819,30 @@ const WalletTracker = () => {
         </main>
       </div>
 
-      {/* Modals */}
+      {/* Confirmation Modal */}
+      {confirmModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-red-100 rounded-lg">
+                <AlertCircle className="text-red-600" size={24} />
+              </div>
+              <h3 className="text-2xl font-bold text-[#1E1E1E]">{confirmModal.title}</h3>
+            </div>
+            <p className="text-gray-600 mb-8">{confirmModal.message}</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmModal({ show: false, action: null, targetId: null, message: "", title: "" })} className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-all">
+                Cancel
+              </button>
+              <button onClick={handleConfirmAction} className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all">
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
@@ -691,7 +859,7 @@ const WalletTracker = () => {
                 <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Account Type</label>
                 <select value={newWallet.type} onChange={(e) => setNewWallet({...newWallet, type: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                   <option>Wallet</option>
-                  <option>Savings</option>
+                  <option>Loan</option>
                   <option>Credit</option>
                   <option>Investments</option>
                 </select>
@@ -719,6 +887,7 @@ const WalletTracker = () => {
         </div>
       )}
 
+      {/* Save/Load Modal */}
       {showSaveLoadModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
