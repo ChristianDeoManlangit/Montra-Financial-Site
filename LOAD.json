@@ -1,0 +1,45 @@
+{
+  "wallets": [
+    {
+      "id": 1764592570263,
+      "name": "Ched",
+      "type": "Wallet",
+      "balance": 9000,
+      "icon": "💵",
+      "color": "#6366f1"
+    },
+    {
+      "id": 1764592603220,
+      "name": "Gcash",
+      "type": "Wallet",
+      "balance": 108,
+      "icon": "💳",
+      "color": "#ec4899"
+    },
+    {
+      "id": 1764592641455,
+      "name": "MariBank",
+      "type": "Savings",
+      "balance": 130,
+      "icon": "💳",
+      "color": "#ec4899"
+    },
+    {
+      "id": 1764592653403,
+      "name": "Maya",
+      "type": "Wallet",
+      "balance": 93,
+      "icon": "💳",
+      "color": "#f59e0b"
+    },
+    {
+      "id": 1764592733966,
+      "name": "Loan A",
+      "type": "Wallet",
+      "balance": 400,
+      "icon": "💰",
+      "color": "#10b981"
+    }
+  ],
+  "exportDate": "2025-12-01T12:38:57.239Z"
+}

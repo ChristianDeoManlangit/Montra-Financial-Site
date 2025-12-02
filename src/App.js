@@ -16,7 +16,6 @@ import {
   EyeOff,
   Plus,
   X,
-  Edit2,
   Trash2,
   Save,
   TrendingUp,
@@ -24,13 +23,18 @@ import {
   CreditCard,
   Download,
   Upload,
-  Menu,
   ReceiptText,
   Settings,
   User,
   ArrowRight,
   Trash,
   AlertCircle,
+  Pin,
+  Lock,
+  Unlock,
+  Send,
+  GripVertical,
+  ChevronDown,
 } from "lucide-react";
 
 const COLORS = [
@@ -80,6 +84,59 @@ style.textContent = `
       transform: scale(1);
     }
   }
+
+  @keyframes slideInFromLeft {
+    from {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOutToLeft {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes slideInFromRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOutToRight {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes countUp {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
   
   .animate-fadeIn {
     animation: fadeIn 0.5s ease-out;
@@ -92,8 +149,159 @@ style.textContent = `
   .animate-scaleIn {
     animation: scaleIn 0.3s ease-out;
   }
+
+  .drag-handle {
+    cursor: grab;
+  }
+
+  .drag-handle:active {
+    cursor: grabbing;
+  }
+
+  .dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+  }
+
+  .drag-over {
+    background-color: rgba(99, 102, 241, 0.2);
+    border-color: #6366f1;
+    transform: scale(0.98);
+  }
+
+  .drag-item {
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  }
+
+  .drag-item:active {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  .custom-dropdown {
+    position: relative;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-height: 250px;
+    overflow-y-auto;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .dropdown-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.15s ease;
+  }
+
+  .dropdown-item:hover {
+    background-color: #f3f4f6;
+  }
+
+  .dropdown-item.selected {
+    background-color: #eef2ff;
+    color: #4f46e5;
+  }
+
+  .animate-countUp {
+    animation: countUp 0.5s ease-out;
+  }
+
+  .drag-item.pinned {
+    cursor: not-allowed;
+    opacity: 0.8;
+  }
+
+  body.modal-open {
+    overflow: hidden;
+  }
 `;
 document.head.appendChild(style);
+
+// Custom Dropdown Component
+const CustomDropdown = ({ options, value, onChange, placeholder = "Select option" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="custom-dropdown relative w-full">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 flex items-center justify-between text-left bg-white hover:bg-gray-50 transition-all"
+      >
+        <span>
+          {value
+            ? options.find((opt) => opt.value === value)?.label || placeholder
+            : placeholder}
+        </span>
+        <ChevronDown
+          size={18}
+          className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="dropdown-menu mt-1 w-full">
+          {options.map((option) => (
+            <div
+              key={option.value}
+              className={`dropdown-item ${value === option.value ? "selected" : ""}`}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+            >
+              <span>{option.icon}</span>
+              <span>{option.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Number Counter Component
+const AnimatedNumber = ({ value, prefix = "", suffix = "", decimals = 2 }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = value;
+    const duration = 1000; // 1 second
+    const increment = end / (duration / 16); // 60fps
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setDisplayValue(end);
+        clearInterval(timer);
+      } else {
+        setDisplayValue(Math.floor(start));
+      }
+    }, 16);
+
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return (
+    <span className="animate-countUp">
+      {prefix}
+      {displayValue.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
+      {suffix}
+    </span>
+  );
+};
 
 const WalletTracker = () => {
   // Initialize state with data from localStorage immediately (before render)
@@ -146,6 +354,13 @@ const WalletTracker = () => {
   });
   const [activeTab, setActiveTab] = useState("dashboard");
   const [confirmModal, setConfirmModal] = useState({ show: false, action: null, targetId: null, message: "", title: "" });
+  const [showEditOverlay, setShowEditOverlay] = useState(null);
+  const [showTransferOverlay, setShowTransferOverlay] = useState(null);
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferToWallet, setTransferToWallet] = useState(null);
+  const [draggedWallet, setDraggedWallet] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [touchY, setTouchY] = useState(0);
 
   const icons = ["💳", "🏦", "💵", "💰", "📱", "🎯", "💎", "🏪", "🎨", "⭐"];
 
@@ -179,10 +394,25 @@ const WalletTracker = () => {
     }
   }, [savedStates]);
 
+  // Disable body scroll when modal or sidebar is open on mobile
+  useEffect(() => {
+    if (showAddModal || showSaveLoadModal || showEditOverlay || showTransferOverlay || confirmModal.show || sidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [showAddModal, showSaveLoadModal, showEditOverlay, showTransferOverlay, confirmModal.show, sidebarOpen]);
+
   // Debug function
   const debugStorage = () => {
+    // eslint-disable-next-line no-unused-vars
     const walletsData = localStorage.getItem("montra_wallets");
+    // eslint-disable-next-line no-unused-vars
     const transactionsData = localStorage.getItem("montra_transactions");
+    // eslint-disable-next-line no-unused-vars
     const statesData = localStorage.getItem("montra_savedStates");
     
     console.log("📊 === STORAGE DEBUG ===");
@@ -196,15 +426,18 @@ const WalletTracker = () => {
     alert(`📊 STORAGE DEBUG:\n\nWallets: ${wallets.length} items\nTransactions: ${transactions.length} items\nStates: ${savedStates.length} items\n\n✅ Check console (F12) for detailed info`);
   };
 
-  const totalNetWorth = wallets.reduce((sum, wallet) => sum + wallet.balance, 0);
+  // Calculate unfrozen wallets and totals
+  const getUnfrozenWallets = () => wallets.filter(w => !w.frozen);
+  const totalNetWorth = getUnfrozenWallets().reduce((sum, wallet) => sum + wallet.balance, 0);
   
   const getFilteredWallets = () => {
-    if (analyticsFilter === "All") return wallets;
-    if (analyticsFilter === "Wallets") return wallets.filter(w => w.type === "Wallet");
-    if (analyticsFilter === "Loans") return wallets.filter(w => w.type === "Loan");
-    if (analyticsFilter === "Credit") return wallets.filter(w => w.type === "Credit");
-    if (analyticsFilter === "Investments") return wallets.filter(w => w.type === "Investments");
-    return wallets;
+    const unfrozen = getUnfrozenWallets();
+    if (analyticsFilter === "All") return unfrozen;
+    if (analyticsFilter === "Wallets") return unfrozen.filter(w => w.type === "Wallet");
+    if (analyticsFilter === "Loans") return unfrozen.filter(w => w.type === "Loan");
+    if (analyticsFilter === "Credit") return unfrozen.filter(w => w.type === "Credit");
+    if (analyticsFilter === "Investments") return unfrozen.filter(w => w.type === "Investments");
+    return unfrozen;
   };
 
   const filteredWalletsForAnalytics = getFilteredWallets();
@@ -265,6 +498,7 @@ const WalletTracker = () => {
   };
 
   const handleUpdateBalance = (id, newBalance) => {
+    // eslint-disable-next-line no-unused-vars
     const walletToUpdate = wallets.find((w) => w.id === id);
     if (walletToUpdate) {
       const balanceDifference = parseFloat(newBalance) - walletToUpdate.balance;
@@ -350,6 +584,87 @@ const WalletTracker = () => {
       handleRemoveAllTransactions();
     }
   };
+
+  const togglePinWallet = (id) => {
+    const wallet = wallets.find(w => w.id === id);
+    const pinnedCount = wallets.filter(w => w.pinned && !w.frozen).length;
+    
+    if (!wallet.pinned && pinnedCount >= 3) {
+      return;
+    }
+    
+    if (!wallet.pinned) {
+      const newWallets = wallets.filter(w => w.id !== id);
+      setWallets([{ ...wallet, pinned: true }, ...newWallets]);
+    } else {
+      setWallets(wallets.map(w => 
+        w.id === id ? { ...w, pinned: false } : w
+      ));
+    }
+  };
+
+  const toggleFreezeWallet = (id) => {
+    setWallets(wallets.map(w => 
+      w.id === id ? { ...w, frozen: !w.frozen } : w
+    ));
+  };
+
+  const updateWalletProperties = (id, updates) => {
+    setWallets(wallets.map(w => 
+      w.id === id ? { ...w, ...updates } : w
+    ));
+  };
+
+  const handleTransferFunds = (fromId, toId, amount) => {
+    const amountNum = parseFloat(amount);
+    if (amountNum <= 0) {
+      alert("Transfer amount must be greater than 0");
+      return;
+    }
+
+    const fromWallet = wallets.find(w => w.id === fromId);
+    const toWallet = wallets.find(w => w.id === toId);
+
+    if (fromWallet && toWallet && fromWallet.balance >= amountNum) {
+      setWallets(wallets.map(w => {
+        if (w.id === fromId) return { ...w, balance: w.balance - amountNum };
+        if (w.id === toId) return { ...w, balance: w.balance + amountNum };
+        return w;
+      }));
+
+      setTransactions([...transactions, {
+        id: Date.now(),
+        type: "Transfer",
+        walletName: `${fromWallet.name} → ${toWallet.name}`,
+        icon: "🔄",
+        amount: -amountNum,
+        date: new Date().toISOString(),
+      }]);
+
+      setShowTransferOverlay(null);
+      setTransferAmount("");
+      setTransferToWallet(null);
+    } else {
+      alert("Insufficient balance for transfer");
+    }
+  };
+
+  const reorderWallets = (draggedIndex, targetIndex) => {
+    const newWallets = [...wallets];
+    const [draggedItem] = newWallets.splice(draggedIndex, 1);
+    newWallets.splice(targetIndex, 0, draggedItem);
+    setWallets(newWallets);
+  };
+
+  const getPinnedWallets = () => wallets.filter(w => w.pinned && !w.frozen).slice(0, 3);
+
+  // Dropdown options
+  const accountTypeOptions = [
+    { label: "Wallet", value: "Wallet", icon: "💳" },
+    { label: "Loan", value: "Loan", icon: "🏦" },
+    { label: "Credit", value: "Credit", icon: "💵" },
+    { label: "Investments", value: "Investments", icon: "📈" },
+  ];
 
   return (
     <div className="min-h-screen bg-[#F1F3FF] flex">
@@ -474,7 +789,7 @@ const WalletTracker = () => {
                         </div>
                         <div>
                           <p className="text-sm text-gray-500 font-medium mb-1">Total Balance</p>
-                          <h3 className="text-3xl font-bold text-[#1E1E1E]">{showBalances ? `₱${totalNetWorth.toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••••"}</h3>
+                          <h3 className="text-3xl font-bold text-[#1E1E1E]">{showBalances ? <AnimatedNumber value={totalNetWorth} prefix="₱" /> : "₱••••••"}</h3>
                         </div>
                       </div>
                       <button onClick={() => setShowBalances(!showBalances)} className="p-3 bg-gray-100 rounded-lg hover:bg-gray-200">
@@ -489,21 +804,21 @@ const WalletTracker = () => {
                         <TrendingUp className="text-green-600" size={14} />
                       </div>
                       <p className="text-xs text-gray-500 font-medium mb-0.5">Accounts</p>
-                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E]">{wallets.length}</h3>
+                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E]"><AnimatedNumber value={wallets.length} decimals={0} /></h3>
                     </div>
                     <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200">
                       <div className="p-1 sm:p-2 lg:p-3 bg-purple-100 rounded-lg w-fit mb-1 sm:mb-3 lg:mb-3">
                         <CreditCard className="text-purple-600" size={14} />
                       </div>
                       <p className="text-xs text-gray-500 font-medium mb-0.5">Wallets</p>
-                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E] truncate">{showBalances ? `₱${wallets.filter(w => w.type === "Wallet").reduce((sum, w) => sum + w.balance, 0).toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••••"}</h3>
+                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E] truncate">{showBalances ? <AnimatedNumber value={wallets.filter(w => w.type === "Wallet").reduce((sum, w) => sum + w.balance, 0)} prefix="₱" /> : "₱••••••"}</h3>
                     </div>
                     <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200">
                       <div className="p-1 sm:p-2 lg:p-3 bg-orange-100 rounded-lg w-fit mb-1 sm:mb-3 lg:mb-3">
                         <CreditCard className="text-orange-600" size={14} />
                       </div>
                       <p className="text-xs text-gray-500 font-medium mb-0.5">Loans</p>
-                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E] truncate">{showBalances ? `₱${wallets.filter(w => w.type === "Loan").reduce((sum, w) => sum + w.balance, 0).toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••••"}</h3>
+                      <h3 className="text-sm sm:text-lg lg:text-2xl font-bold text-[#1E1E1E] truncate">{showBalances ? <AnimatedNumber value={wallets.filter(w => w.type === "Loan").reduce((sum, w) => sum + w.balance, 0)} prefix="₱" /> : "₱••••••"}</h3>
                     </div>
                     <button onClick={() => setSidebarOpen(true)} className="lg:hidden flex flex-col items-center justify-center border-2 border-dashed border-indigo-300 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 hover:bg-indigo-50 transition-all bg-white shadow-sm">
                       <span className="text-lg sm:text-2xl lg:text-3xl text-indigo-500 mb-0.5">☰</span>
@@ -524,11 +839,16 @@ const WalletTracker = () => {
                       <p className="text-center text-gray-400 py-8">No accounts yet</p>
                     ) : (
                       <div className="grid grid-cols-2 gap-4">
-                        {wallets.slice(0, 3).map((wallet) => (
-                          <div key={wallet.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        {getPinnedWallets().map((wallet) => (
+                          <div key={wallet.id} className={`bg-gray-50 rounded-xl p-4 border border-gray-200 ${wallet.frozen ? "opacity-60 grayscale" : ""}`}>
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-2xl">{wallet.icon}</span>
                               <span className="font-semibold text-[#1E1E1E] text-sm">{wallet.name}</span>
+                              {wallet.pinned && (
+                                <div className="p-1 bg-yellow-100 rounded text-yellow-600">
+                                  <Pin size={14} />
+                                </div>
+                              )}
                             </div>
                             <p className="text-xs text-gray-500 mb-1">{wallet.type}</p>
                             <p className="text-lg font-bold text-[#1E1E1E]">{showBalances ? `₱${wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••"}</p>
@@ -598,18 +918,19 @@ const WalletTracker = () => {
                       </div>
                       <div className="flex-1 space-y-2 max-h-64 overflow-y-auto">
                         {wallets.map((wallet) => (
-                          <div key={wallet.id} className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{backgroundColor: wallet.color}} />
-                              <span className="text-[#1E1E1E] font-medium">{wallet.name}</span>
+                          <div key={wallet.id} className="flex items-center justify-between text-sm p-2 hover:bg-gray-50 rounded">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{backgroundColor: wallet.color}} />
+                              <span className="text-[#1E1E1E] font-medium truncate">{wallet.name}</span>
                             </div>
-                            <span className="text-gray-600">₱{wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
-                            <span className="text-gray-400">{totalNetWorth > 0 ? ((wallet.balance / totalNetWorth) * 100).toFixed(1) : 0}%</span>
+                            <span className="text-gray-600 w-28 text-right">₱{wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+                            <span className="text-gray-400 w-12 text-right">{totalNetWorth > 0 ? ((wallet.balance / totalNetWorth) * 100).toFixed(1) : 0}%</span>
                           </div>
                         ))}
-                        <div className="pt-2 border-t border-gray-200 flex justify-between font-bold text-[#1E1E1E]">
-                          <span>Total Funds</span>
-                          <span>₱{totalNetWorth.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+                        <div className="pt-2 border-t border-gray-200 flex items-center text-sm p-2 font-bold text-[#1E1E1E]">
+                          <span className="flex-1">Total Funds</span>
+                          <span className="w-28 text-right">₱{totalNetWorth.toLocaleString("en-US", {minimumFractionDigits: 2})}</span>
+                          <span className="w-12"></span>
                         </div>
                       </div>
                     </div>
@@ -651,28 +972,88 @@ const WalletTracker = () => {
                 {wallets.length === 0 ? (
                   <p className="text-center text-gray-400 py-12">No accounts yet</p>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {(accountsFilter === "All" ? wallets : wallets.filter(w => w.type === accountsFilter)).map((wallet, index) => (
-                      <div key={wallet.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-lg transition-all" style={{animationDelay: `${index * 50}ms`}}>
-                        <div className="flex justify-between items-start mb-3">
-                          <span className="text-3xl">{wallet.icon}</span>
-                          <div className="flex gap-1">
-                            <button onClick={() => setEditingWallet(wallet.id)} className="p-1 bg-white hover:bg-gray-100 rounded"><Edit2 size={14} /></button>
-                            <button onClick={() => setConfirmModal({ show: true, action: "deleteWallet", targetId: wallet.id, message: `Are you sure you want to delete "${wallet.name}"? This action cannot be undone.`, title: "Delete Account" })} className="p-1 bg-white hover:bg-red-50 text-red-600 rounded"><Trash2 size={14} /></button>
+                  <div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {(accountsFilter === "All" ? wallets : wallets.filter(w => w.type === accountsFilter)).sort((a, b) => b.pinned - a.pinned).map((wallet, index) => (
+                        <div
+                          key={wallet.id}
+                          draggable={!wallet.pinned}
+                          onDragStart={() => setDraggedWallet(index)}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDragOverIndex(index);
+                          }}
+                          onDragLeave={() => setDragOverIndex(null)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (draggedWallet !== null && draggedWallet !== index) {
+                              reorderWallets(draggedWallet, index);
+                            }
+                            setDraggedWallet(null);
+                            setDragOverIndex(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedWallet(null);
+                            setDragOverIndex(null);
+                          }}
+                          onTouchStart={(e) => setTouchY(e.touches[0].clientY)}
+                          onTouchMove={(e) => {
+                            const currentY = e.touches[0].clientY;
+                            if (currentY < touchY - 20) {
+                              setDragOverIndex(index - 1);
+                            } else if (currentY > touchY + 20) {
+                              setDragOverIndex(index + 1);
+                            }
+                          }}
+                          onTouchEnd={() => {
+                            if (dragOverIndex !== null && draggedWallet !== null && draggedWallet !== dragOverIndex) {
+                              reorderWallets(draggedWallet, dragOverIndex);
+                            }
+                            setDraggedWallet(null);
+                            setDragOverIndex(null);
+                          }}
+                          className={`bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-lg transition-all drag-item ${
+                            draggedWallet === index ? "dragging" : ""
+                          } ${
+                            dragOverIndex === index ? "drag-over" : ""
+                          } ${
+                            wallet.frozen ? "opacity-60 grayscale" : ""
+                          } ${wallet.pinned ? "pinned" : ""}`}
+                          style={{animationDelay: `${index * 50}ms`}}
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center gap-2">
+                              <GripVertical size={16} className="text-gray-400 drag-handle cursor-grab" />
+                              <span className="text-3xl">{wallet.icon}</span>
+                            </div>
+                            <div className="flex gap-1">
+                              {wallet.pinned && (
+                                <div className="p-1 bg-yellow-100 rounded text-yellow-600">
+                                  <Pin size={14} />
+                                </div>
+                              )}
+                              {wallet.frozen && (
+                                <div className="p-1 bg-gray-300 rounded text-gray-600">
+                                  <Lock size={14} />
+                                </div>
+                              )}
+                              <button onClick={() => setConfirmModal({ show: true, action: "deleteWallet", targetId: wallet.id, message: `Are you sure you want to delete "${wallet.name}"? This action cannot be undone.`, title: "Delete Account" })} className="p-1 bg-white hover:bg-red-50 text-red-600 rounded transition-all">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
+                          <h4 className="font-semibold text-[#1E1E1E] mb-1">{wallet.name}</h4>
+                          <p className="text-xs text-gray-500 mb-2">{wallet.type}</p>
+                          <p className="text-lg font-bold text-[#1E1E1E] mb-3">{showBalances ? `₱${wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••"}</p>
+                          <button onClick={() => setShowTransferOverlay(wallet.id)} className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-all flex items-center justify-center gap-2 mb-2">
+                            <Send size={14} /> Transfer
+                          </button>
+                          <button onClick={() => setShowEditOverlay(wallet.id)} className="w-full px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-all">
+                            Edit Account
+                          </button>
                         </div>
-                        <h4 className="font-semibold text-[#1E1E1E] mb-1">{wallet.name}</h4>
-                        <p className="text-xs text-gray-500 mb-2">{wallet.type}</p>
-                        {editingWallet === wallet.id ? (
-                          <div className="flex gap-2">
-                            <input type="number" defaultValue={wallet.balance} className="flex-1 px-2 py-1 text-sm border rounded" onKeyDown={(e) => { if (e.key === "Enter") handleUpdateBalance(wallet.id, e.target.value); }} id={`balance-${wallet.id}`} />
-                            <button onClick={() => { const input = document.getElementById(`balance-${wallet.id}`); handleUpdateBalance(wallet.id, input.value); }} className="px-2 py-1 bg-green-500 text-white rounded text-sm"><Save size={14} /></button>
-                          </div>
-                        ) : (
-                          <p className="text-lg font-bold text-[#1E1E1E]">{showBalances ? `₱${wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••"}</p>
-                        )}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -857,12 +1238,11 @@ const WalletTracker = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Account Type</label>
-                <select value={newWallet.type} onChange={(e) => setNewWallet({...newWallet, type: e.target.value})} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                  <option>Wallet</option>
-                  <option>Loan</option>
-                  <option>Credit</option>
-                  <option>Investments</option>
-                </select>
+                <CustomDropdown
+                  options={accountTypeOptions}
+                  value={newWallet.type}
+                  onChange={(value) => setNewWallet({...newWallet, type: value})}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Current Balance</label>
@@ -925,6 +1305,268 @@ const WalletTracker = () => {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Account Overlay */}
+      {showEditOverlay && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-[#1E1E1E]">Edit Account</h3>
+              <button onClick={() => setShowEditOverlay(null)} className="p-2 hover:bg-gray-100 rounded"><X size={24} /></button>
+            </div>
+
+            {wallets.find(w => w.id === showEditOverlay) && (
+              <div className="space-y-6">
+                {/* Account Info Section */}
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                  <h4 className="text-lg font-semibold text-[#1E1E1E] mb-4">Account Information</h4>
+                  
+                  <div className="space-y-4">
+                    {/* Icon Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Icon</label>
+                      <div className="grid grid-cols-5 gap-2">
+                        {icons.map((icon) => (
+                          <button
+                            key={icon}
+                            onClick={() => updateWalletProperties(showEditOverlay, { icon })}
+                            className={`text-2xl p-3 rounded-lg border-2 transition-all ${
+                              wallets.find(w => w.id === showEditOverlay)?.icon === icon
+                                ? "border-indigo-500 bg-indigo-50"
+                                : "border-gray-200 hover:border-gray-300"
+                            }`}
+                          >
+                            {icon}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Name Field */}
+                    <div>
+                      <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Account Name</label>
+                      <input
+                        type="text"
+                        value={wallets.find(w => w.id === showEditOverlay)?.name || ""}
+                        onChange={(e) => updateWalletProperties(showEditOverlay, { name: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Account name"
+                      />
+                    </div>
+
+                    {/* Balance Field */}
+                    <div>
+                      <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Current Balance</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-2 text-gray-500">₱</span>
+                        <input
+                          type="number"
+                          value={wallets.find(w => w.id === showEditOverlay)?.balance || 0}
+                          onChange={(e) => updateWalletProperties(showEditOverlay, { balance: parseFloat(e.target.value) || 0 })}
+                          className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transfer Funds Section */}
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                  <h4 className="text-lg font-semibold text-[#1E1E1E] mb-4 flex items-center gap-2">
+                    <Send size={20} /> Transfer Funds
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Transfer To</label>
+                      <select
+                        value={transferToWallet || ""}
+                        onChange={(e) => setTransferToWallet(parseInt(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">Select destination account</option>
+                        {wallets.filter(w => w.id !== showEditOverlay && !w.frozen).map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.icon} {w.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Amount</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-2 text-gray-500">₱</span>
+                        <input
+                          type="number"
+                          value={transferAmount}
+                          onChange={(e) => setTransferAmount(e.target.value)}
+                          className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (transferToWallet && transferAmount) {
+                          handleTransferFunds(showEditOverlay, transferToWallet, transferAmount);
+                        } else {
+                          alert("Please select destination and enter amount");
+                        }
+                      }}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-all flex items-center justify-center gap-2"
+                    >
+                      <Send size={18} /> Transfer Now
+                    </button>
+                  </div>
+                </div>
+
+                {/* Freeze Account Section */}
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                  <h4 className="text-lg font-semibold text-[#1E1E1E] mb-4 flex items-center gap-2">
+                    {wallets.find(w => w.id === showEditOverlay)?.frozen ? <Lock size={20} /> : <Unlock size={20} />}
+                    Account Status
+                  </h4>
+                  
+                  <button
+                    onClick={() => toggleFreezeWallet(showEditOverlay)}
+                    className={`w-full px-4 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                      wallets.find(w => w.id === showEditOverlay)?.frozen
+                        ? "bg-green-600 text-white hover:bg-green-700"
+                        : "bg-red-600 text-white hover:bg-red-700"
+                    }`}
+                  >
+                    {wallets.find(w => w.id === showEditOverlay)?.frozen ? (
+                      <>
+                        <Unlock size={18} /> Unfreeze Account
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={18} /> Freeze Account
+                      </>
+                    )}
+                  </button>
+                  
+                  <p className="text-xs text-gray-500 mt-3 text-center">
+                    {wallets.find(w => w.id === showEditOverlay)?.frozen
+                      ? "This account is frozen and will not appear in calculations or charts."
+                      : "Freezing this account will exclude it from all calculations and charts."}
+                  </p>
+                </div>
+
+                {/* Pin Account Section */}
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                  <h4 className="text-lg font-semibold text-[#1E1E1E] mb-4 flex items-center gap-2">
+                    <Pin size={20} /> Dashboard Pin
+                  </h4>
+                  
+                  <button
+                    onClick={() => togglePinWallet(showEditOverlay)}
+                    className={`w-full px-4 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                      wallets.find(w => w.id === showEditOverlay)?.pinned
+                        ? "bg-yellow-600 text-white hover:bg-yellow-700"
+                        : "bg-gray-400 text-white hover:bg-gray-500"
+                    }`}
+                  >
+                    <Pin size={18} /> {wallets.find(w => w.id === showEditOverlay)?.pinned ? "Unpin from Dashboard" : "Pin to Dashboard"}
+                  </button>
+                  
+                  <p className="text-xs text-gray-500 mt-3 text-center">
+                    Pin up to 3 accounts to show them on the dashboard
+                  </p>
+                </div>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowEditOverlay(null)}
+                  className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-all"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Overlay */}
+      {showTransferOverlay && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto animate-scaleIn">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-[#1E1E1E]">Transfer Funds</h3>
+              <button onClick={() => setShowTransferOverlay(null)} className="p-2 hover:bg-gray-100 rounded"><X size={24} /></button>
+            </div>
+
+            {wallets.find(w => w.id === showTransferOverlay) && (
+              <div className="space-y-4">
+                <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                  <p className="text-xs text-indigo-600 font-medium mb-1">From</p>
+                  <p className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                    <span className="text-2xl">{wallets.find(w => w.id === showTransferOverlay)?.icon}</span>
+                    {wallets.find(w => w.id === showTransferOverlay)?.name}
+                  </p>
+                  <p className="text-sm text-indigo-700 mt-2">
+                    Balance: ₱{(wallets.find(w => w.id === showTransferOverlay)?.balance || 0).toLocaleString("en-US", {minimumFractionDigits: 2})}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Transfer To</label>
+                  <select
+                    value={transferToWallet || ""}
+                    onChange={(e) => setTransferToWallet(parseInt(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Select destination account</option>
+                    {wallets.filter(w => w.id !== showTransferOverlay && !w.frozen).map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.icon} {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-2 text-gray-500">₱</span>
+                    <input
+                      type="number"
+                      value={transferAmount}
+                      onChange={(e) => setTransferAmount(e.target.value)}
+                      className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (transferToWallet && transferAmount) {
+                      handleTransferFunds(showTransferOverlay, transferToWallet, transferAmount);
+                    } else {
+                      alert("Please select destination and enter amount");
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-all flex items-center justify-center gap-2"
+                >
+                  <Send size={18} /> Confirm Transfer
+                </button>
+
+                <button
+                  onClick={() => setShowTransferOverlay(null)}
+                  className="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
