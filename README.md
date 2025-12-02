@@ -55,33 +55,32 @@ Montra is a React-based dashboard that simplifies financial management. Users ca
 
 ## 📷 Screenshots
 
-### Desktop (1-2-2 grid)
+### Desktop
 
 | Dashboard |
 |-----------|
-| ![Dashboard](path_to_desktop_dashboard_image) |
+| ![Dashboard](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/DASHBOARD.png) |
 
 | Add Account | Accounts |
 |------------|---------|
-| ![Add Account](path_to_desktop_add_account_image) | ![Accounts](path_to_desktop_accounts_image) |
+| ![Add Account](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/ADD%20ACCOUNT.png) | ![Accounts](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/ACCOUNTS.png) |
 
 | Analytics | Transaction History |
 |-----------|--------------------|
-| ![Analytics](path_to_desktop_analytics_image) | ![Transaction History](path_to_desktop_transaction_history_image) |
+| ![Analytics](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/ANALYTICS.png) | ![Transaction History](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/TRANSACTION%20HISTORY.png) |
 
-### Mobile (2-2-2 grid)
-
-| Dashboard | Navbar |
 |-----------|--------|
 | ![Dashboard](path_to_mobile_dashboard_image) | ![Navbar](path_to_mobile_navbar_image) |
 
-| Add Account | Accounts |
-|------------|---------|
-| ![Add Account](path_to_mobile_add_account_image) | ![Accounts](path_to_mobile_accounts_image) |
+### Mobile
 
-| Analytics | Transaction History |
-|-----------|--------------------|
-| ![Analytics](path_to_mobile_analytics_image) | ![Transaction History](path_to_mobile_transaction_history_image) |
+| Dashboard |
+|-----------|
+| ![Dashboard](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/Mobile.png) |
+
+| Accounts | Analytics & Transaction History |
+|-----------|--------|
+| ![Accounts](https://github.com/ChristianDeoManlangit/Montra-Financial-Site/blob/main/public/Montra/Mobile%201.png?raw=true) | ![Analytics & Transaction History](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/Mobile%202.png) |
 
 ---
 
