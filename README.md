@@ -167,4 +167,3 @@ MIT License
 ## 👤 Author
 
 Made with ❤️ by Chai
-```
