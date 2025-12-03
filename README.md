@@ -69,9 +69,6 @@ Montra is a React-based dashboard that simplifies financial management. Users ca
 |-----------|--------------------|
 | ![Analytics](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/ANALYTICS.png) | ![Transaction History](https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/TRANSACTION%20HISTORY.png) |
 
-|-----------|--------|
-| ![Dashboard](path_to_mobile_dashboard_image) | ![Navbar](path_to_mobile_navbar_image) |
-
 ### Mobile
 
 | Dashboard |
