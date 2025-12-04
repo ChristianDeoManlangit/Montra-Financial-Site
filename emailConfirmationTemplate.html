@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Your Email - Montra Wallet Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f9fafb;
+            line-height: 1.6;
+            color: #374151;
+        }
+        
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            overflow: hidden;
+        }
+        
+        .email-header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            padding: 40px 20px;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+        
+        .logo-text {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 400;
+        }
+        
+        .email-content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 15px;
+        }
+        
+        .content-text {
+            font-size: 16px;
+            color: #4b5563;
+            margin-bottom: 20px;
+            line-height: 1.8;
+        }
+        
+        .highlight {
+            color: #6366f1;
+            font-weight: 600;
+        }
+        
+        .cta-container {
+            margin: 40px 0;
+            text-align: center;
+        }
+        
+        .confirm-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            padding: 16px 48px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+            border: none;
+            cursor: pointer;
+        }
+        
+        .confirm-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+        }
+        
+        .confirmation-code {
+            background-color: #f3f4f6;
+            border-left: 4px solid #6366f1;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+        }
+        
+        .code-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        
+        .code-value {
+            font-size: 24px;
+            color: #1f2937;
+            letter-spacing: 3px;
+            font-weight: 600;
+        }
+        
+        .security-notice {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            margin: 30px 0;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #92400e;
+        }
+        
+        .security-notice strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #b45309;
+        }
+        
+        .email-footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .footer-text {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 15px;
+        }
+        
+        .footer-links {
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .footer-links a {
+            color: #6366f1;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .divider {
+            border: none;
+            border-top: 1px solid #e5e7eb;
+            margin: 20px 0;
+        }
+        
+        .social-links {
+            margin-top: 15px;
+        }
+        
+        .social-links a {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            background-color: #e5e7eb;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 36px;
+            margin: 0 5px;
+            color: #6366f1;
+            text-decoration: none;
+            font-size: 16px;
+        }
+        
+        .social-links a:hover {
+            background-color: #6366f1;
+            color: white;
+        }
+        
+        @media (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            
+            .email-content {
+                padding: 25px 20px;
+            }
+            
+            .greeting {
+                font-size: 20px;
+            }
+            
+            .confirm-button {
+                padding: 14px 40px;
+                font-size: 15px;
+            }
+            
+            .code-value {
+                font-size: 20px;
+                letter-spacing: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <div class="logo">💰 Montra</div>
+            <div class="logo-text">Wallet Tracker</div>
+        </div>
+        
+        <div class="email-content">
+            <div class="greeting">Welcome to Montra!</div>
+            
+            <p class="content-text">
+                Thank you for signing up. To complete your registration and secure your account, please confirm your email address by clicking the button below.
+            </p>
+            
+            <div class="cta-container">
+                <a href="[CONFIRMATION_LINK]" class="confirm-button">Confirm Your Email</a>
+            </div>
+            
+            <p class="content-text">
+                Or use this confirmation code:
+            </p>
+            
+            <div class="confirmation-code">
+                <div class="code-label">Confirmation Code</div>
+                <div class="code-value">[CONFIRMATION_CODE]</div>
+            </div>
+            
+            <p class="content-text">
+                This link will expire in <span class="highlight">24 hours</span> for security purposes.
+            </p>
+            
+            <div class="security-notice">
+                <strong>🔒 Security Notice</strong>
+                If you didn't create this account, please ignore this email or contact our support team immediately.
+            </div>
+            
+            <p class="content-text">
+                Once confirmed, you'll have full access to Montra's features including:
+            </p>
+            
+            <ul style="margin: 15px 0 15px 20px; color: #4b5563;">
+                <li style="margin-bottom: 8px;">📊 Track multiple wallets and accounts</li>
+                <li style="margin-bottom: 8px;">💳 Manage loans and credit cards</li>
+                <li style="margin-bottom: 8px;">📈 Monitor investments and net worth</li>
+                <li style="margin-bottom: 8px;">📱 Access on all your devices</li>
+            </ul>
+        </div>
+        
+        <div class="email-footer">
+            <div class="footer-text">
+                © 2024 Montra Wallet Tracker. All rights reserved.
+            </div>
+            
+            <div class="footer-links">
+                <a href="[HELP_LINK]">Help Center</a>
+                <a href="[PRIVACY_LINK]">Privacy Policy</a>
+                <a href="[TERMS_LINK]">Terms of Service</a>
+            </div>
+            
+            <hr class="divider">
+            
+            <div class="footer-text">
+                Montra, Inc. | [YOUR_ADDRESS] | [YOUR_CITY], [STATE] [ZIP]
+            </div>
+            
+            <div class="social-links">
+                <a href="[TWITTER]" title="Twitter">𝕏</a>
+                <a href="[FACEBOOK]" title="Facebook">f</a>
+                <a href="[INSTAGRAM]" title="Instagram">📷</a>
+                <a href="[LINKEDIN]" title="LinkedIn">in</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,528 @@
+import React, { useState, useEffect } from "react";
+import { useAuth } from "./AuthContext";
+import LoginScreen from "./LoginScreen";
+import WalletTracker from "./WalletTracker";
+import LandingPage from "./LandingPage";
+import { supabase } from "./supabaseClient";
+import { Camera, LogOut, Mail, User, Lock, Key, AlertCircle, CheckCircle, X, ChevronRight } from "lucide-react";
+
+const style = document.createElement("style");
+style.textContent = `
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.5s ease-out;
+  }
+  
+  .animate-slideIn {
+    animation: slideIn 0.4s ease-out;
+  }
+  
+  .animate-scaleIn {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  .animate-bounce {
+    animation: bounce 1s infinite;
+  }
+`;
+document.head.appendChild(style);
+
+function App() {
+  const { user, loading } = useAuth();
+  const [showSettings, setShowSettings] = useState(false);
+  const [showSetupOverlay, setShowSetupOverlay] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState("profile");
+  const [profileImage, setProfileImage] = useState(null);
+  const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("");
+  const [setupStep, setSetupStep] = useState(0);
+  const [hasSeenTutorial, setHasSeenTutorial] = useState(() => {
+    return localStorage.getItem("montra_seen_tutorial") === "true";
+  });
+
+  // Load user profile
+  useEffect(() => {
+    if (user) {
+      loadUserProfile();
+      if (!hasSeenTutorial) {
+        setShowSetupOverlay(true);
+        localStorage.setItem("montra_seen_tutorial", "true");
+      }
+    }
+  }, [user, hasSeenTutorial]);
+
+  const loadUserProfile = async () => {
+    if (user) {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("username, avatar_url, email")
+          .eq("id", user.id)
+          .single();
+
+        if (data) {
+          setUserName(data.username || "User");
+          setUserEmail(user.email || "");
+          if (data.avatar_url) {
+            setProfileImage(data.avatar_url);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading profile:", err);
+        setUserEmail(user.email || "");
+      }
+    }
+  };
+
+  const handleProfileImageChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      // Convert image to base64 for localStorage
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64String = event.target?.result;
+        if (typeof base64String === "string") {
+          // Save to localStorage
+          localStorage.setItem(`montra_profile_image_${user.id}`, base64String);
+          setProfileImage(base64String);
+
+          // Also try to save to Supabase
+          try {
+            await supabase
+              .from("profiles")
+              .update({ avatar_url: base64String })
+              .eq("id", user.id);
+          } catch (err) {
+            console.log("Note: Supabase update skipped, using localStorage");
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Error uploading profile image:", error);
+      alert("Failed to upload image. It will be saved locally.");
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+            <img src="/logo.png" alt="Montra" className="w-10 h-10" />
+          </div>
+          <p className="text-gray-600 font-medium">Loading Montra...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is not logged in, show landing page first, then login
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  const tutorialSteps = [
+    {
+      title: "Welcome to Montra!",
+      description: "Your personal financial dashboard",
+      image: "https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/DASHBOARD.png",
+      tab: "dashboard",
+    },
+    {
+      title: "Manage Your Accounts",
+      description: "Add and manage all your financial accounts",
+      image: "https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/ACCOUNTS.png",
+      tab: "accounts",
+    },
+    {
+      title: "View Analytics",
+      description: "Visualize your wealth distribution",
+      image: "https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/ANALYTICS.png",
+      tab: "analytics",
+    },
+    {
+      title: "Track Transactions",
+      description: "Monitor all your financial activities",
+      image: "https://raw.githubusercontent.com/ChristianDeoManlangit/Montra-Financial-Site/refs/heads/main/public/Montra/TRANSACTION%20HISTORY.png",
+      tab: "transaction",
+    },
+  ];
+
+  return (
+    <div className="relative">
+      {/* Top-right Settings Button */}
+      <div className="fixed top-6 right-6 z-40 flex items-center gap-3">
+        <button
+          onClick={() => setShowSettings(true)}
+          className="p-3 bg-white rounded-full shadow-lg hover:shadow-xl hover:bg-gray-50 transition-all border border-gray-200"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-gray-700"
+          >
+            <circle cx="12" cy="12" r="1"></circle>
+            <path d="M12 1v6m0 6v6"></path>
+            <path d="M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24"></path>
+            <path d="M1 12h6m6 0h6"></path>
+            <path d="M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path>
+          </svg>
+        </button>
+      </div>
+
+      {/* Settings Overlay */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scaleIn">
+            {/* Settings Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-[#1E1E1E]">Settings</h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Settings Tabs */}
+            <div className="border-b border-gray-200 p-4 flex gap-2">
+              <button
+                onClick={() => setActiveSettingsTab("profile")}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  activeSettingsTab === "profile"
+                    ? "bg-indigo-100 text-indigo-600"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Profile
+              </button>
+              <button
+                onClick={() => setActiveSettingsTab("security")}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  activeSettingsTab === "security"
+                    ? "bg-indigo-100 text-indigo-600"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Security
+              </button>
+            </div>
+
+            {/* Settings Content */}
+            <div className="p-6">
+              {activeSettingsTab === "profile" && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Profile Picture */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#1E1E1E] mb-3">
+                      Profile Picture
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center flex-shrink-0 border-4 border-white shadow-lg overflow-hidden"
+                        style={{
+                          backgroundImage: profileImage
+                            ? `url(${profileImage})`
+                            : undefined,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }}
+                      >
+                        {!profileImage && (
+                          <User size={32} className="text-white" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 cursor-pointer transition-all">
+                          <Camera size={18} />
+                          Upload Photo
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleProfileImageChange}
+                            className="hidden"
+                          />
+                        </label>
+                        <p className="text-xs text-gray-500 mt-2">
+                          JPG, PNG or GIF. Max 5MB.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Username (Non-editable) */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#1E1E1E] mb-2">
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      value={userName}
+                      disabled
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Username cannot be changed
+                    </p>
+                  </div>
+
+                  {/* Email (Non-editable) */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#1E1E1E] mb-2">
+                      Email Address
+                    </label>
+                    <div className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
+                      <Mail size={18} className="text-gray-400" />
+                      <input
+                        type="email"
+                        value={userEmail}
+                        disabled
+                        className="flex-1 bg-transparent text-gray-600 cursor-not-allowed"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Your verified email address
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {activeSettingsTab === "security" && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Change Password */}
+                  <div className="bg-indigo-50 rounded-xl p-6 border border-indigo-200">
+                    <h3 className="font-semibold text-[#1E1E1E] mb-3 flex items-center gap-2">
+                      <Lock size={20} className="text-indigo-600" />
+                      Password Security
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      To change your password, use the forgot password option
+                      on the login page.
+                    </p>
+                    <a
+                      href="/forgot-password"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all"
+                    >
+                      <Key size={18} />
+                      Reset Password
+                    </a>
+                  </div>
+
+                  {/* Account Data */}
+                  <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                    <h3 className="font-semibold text-[#1E1E1E] mb-3">
+                      Account Data
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Your financial data is securely stored and encrypted.
+                      Your privacy is our priority.
+                    </p>
+                    <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all text-sm font-medium">
+                      View Data Policy
+                    </button>
+                  </div>
+
+                  {/* Sign Out */}
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold flex items-center justify-center gap-2"
+                  >
+                    <LogOut size={20} />
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Setup/Tutorial Overlay */}
+      {showSetupOverlay && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scaleIn">
+            {/* Progress Bar */}
+            <div className="w-full h-1 bg-gray-200">
+              <div
+                className="h-full bg-indigo-600 transition-all"
+                style={{ width: `${((setupStep + 1) / tutorialSteps.length) * 100}%` }}
+              ></div>
+            </div>
+
+            {/* Tutorial Content */}
+            <div className="p-8">
+              {setupStep < tutorialSteps.length ? (
+                <>
+                  {/* Question Marks */}
+                  <div className="flex justify-center gap-2 mb-6">
+                    <div
+                      className="w-6 h-6 bg-black rotate-45 flex items-center justify-center text-white text-xs font-bold"
+                      style={{ fontSize: "10px" }}
+                    >
+                      ?
+                    </div>
+                    <div
+                      className="w-6 h-6 bg-black rotate-45 flex items-center justify-center text-white text-xs font-bold"
+                      style={{ fontSize: "10px" }}
+                    >
+                      ?
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <h2 className="text-3xl font-bold text-[#1E1E1E] text-center mb-2">
+                    👋 Welcome to Montra!
+                  </h2>
+                  <p className="text-center text-gray-600 mb-8">
+                    Your personal financial dashboard
+                  </p>
+
+                  {/* Tutorial Image Box */}
+                  <div className="mb-8 h-40 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl flex items-center justify-center overflow-hidden">
+                    <img
+                      src={tutorialSteps[setupStep].image}
+                      alt={tutorialSteps[setupStep].title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {/* Step Text */}
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold text-[#1E1E1E] mb-2">
+                      {tutorialSteps[setupStep].title}
+                    </h3>
+                    <p className="text-gray-600">
+                      {tutorialSteps[setupStep].description}
+                    </p>
+                  </div>
+
+                  {/* Step Counter */}
+                  <p className="text-center text-sm text-gray-500 mb-6">
+                    Step {setupStep + 1} of {tutorialSteps.length}
+                  </p>
+
+                  {/* Navigation Buttons */}
+                  <div className="flex gap-3">
+                    {setupStep > 0 && (
+                      <button
+                        onClick={() => setSetupStep(setupStep - 1)}
+                        className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all"
+                      >
+                        Previous
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (setupStep < tutorialSteps.length - 1) {
+                          setSetupStep(setupStep + 1);
+                        }
+                      }}
+                      className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-all flex items-center justify-center gap-2"
+                    >
+                      Next <ChevronRight size={18} />
+                    </button>
+                  </div>
+
+                  {/* Skip Button */}
+                  <button
+                    onClick={() => setShowSetupOverlay(false)}
+                    className="w-full mt-3 px-4 py-2 text-gray-600 hover:text-gray-700 font-medium transition-all"
+                  >
+                    Skip Tutorial
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Completion Screen */}
+                  <div className="text-center py-8">
+                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle size={48} className="text-green-600" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-[#1E1E1E] mb-2">
+                      You're All Set!
+                    </h2>
+                    <p className="text-gray-600 mb-8">
+                      You're now ready to manage your finances with Montra.
+                      Start by adding your first account!
+                    </p>
+                    <button
+                      onClick={() => setShowSetupOverlay(false)}
+                      className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-all"
+                    >
+                      Start Using Montra
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Wallet Tracker */}
+      <WalletTracker userProfileImage={profileImage} />
+    </div>
+  );
+}
+
+export default App;
