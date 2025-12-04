@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   PieChart,
   Pie,
@@ -36,6 +36,9 @@ import {
   GripVertical,
   ChevronDown,
 } from "lucide-react";
+import { useAuth } from "./AuthContext";
+import { supabase } from "./supabaseClient";
+import LoginScreen from "./LoginScreen";
 
 const COLORS = [
   "#6366f1",
@@ -304,39 +307,177 @@ const AnimatedNumber = ({ value, prefix = "", suffix = "", decimals = 2 }) => {
 };
 
 const WalletTracker = () => {
-  // Initialize state with data from localStorage immediately (before render)
-  const [wallets, setWallets] = useState(() => {
-    try {
-      const saved = localStorage.getItem("montra_wallets");
-      console.log("🔄 Initial wallet load from localStorage:", saved);
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("❌ Failed to load wallets:", e);
-      return [];
-    }
-  });
+  const { user, loading: authLoading } = useAuth();
+  
+  // Initialize state with data from Supabase
+  const [wallets, setWallets] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [savedStates, setSavedStates] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [transactions, setTransactions] = useState(() => {
-    try {
-      const saved = localStorage.getItem("montra_transactions");
-      console.log("🔄 Initial transaction load from localStorage:", saved);
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("❌ Failed to load transactions:", e);
-      return [];
-    }
-  });
+  const walletsRef = useRef(wallets);
+  const transactionsRef = useRef(transactions);
+  const savedStatesRef = useRef(savedStates);
 
-  const [savedStates, setSavedStates] = useState(() => {
+  useEffect(() => {
+    walletsRef.current = wallets;
+  }, [wallets]);
+
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
+
+  useEffect(() => {
+    savedStatesRef.current = savedStates;
+  }, [savedStates]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      
+      setLoading(true);
+      try {
+        // Fetch from user_data table (single row per user)
+        const { data: userData, error: userDataError } = await supabase
+          .from("user_data")
+          .select("wallets, transactions")
+          .eq("user_id", user.id)
+          .single();
+        
+        if (userDataError && userDataError.code !== 'PGRST116') {
+          // PGRST116 = not found, which is fine for new users
+          throw userDataError;
+        }
+
+        if (userData) {
+          console.log("✅ Data loaded from Supabase:", userData);
+          setWallets(userData.wallets || []);
+          setTransactions(userData.transactions || []);
+        } else {
+          // New user - try localStorage as fallback
+          const savedWallets = localStorage.getItem("montra_wallets");
+          const savedTransactions = localStorage.getItem("montra_transactions");
+          
+          setWallets(savedWallets ? JSON.parse(savedWallets) : []);
+          setTransactions(savedTransactions ? JSON.parse(savedTransactions) : []);
+        }
+
+        // Load saved states from localStorage (keeping this local for now)
+        const savedStates = localStorage.getItem("montra_saved_states");
+        setSavedStates(savedStates ? JSON.parse(savedStates) : []);
+      } catch (error) {
+        console.error("❌ Error fetching data:", error);
+        
+        // Fallback to localStorage
+        const savedWallets = localStorage.getItem("montra_wallets");
+        const savedTransactions = localStorage.getItem("montra_transactions");
+        const savedStates = localStorage.getItem("montra_saved_states");
+        
+        setWallets(savedWallets ? JSON.parse(savedWallets) : []);
+        setTransactions(savedTransactions ? JSON.parse(savedTransactions) : []);
+        setSavedStates(savedStates ? JSON.parse(savedStates) : []);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  const saveWalletsToDatabase = async () => {
+    if (!user) return;
+    
     try {
-      const saved = localStorage.getItem("montra_savedStates");
-      console.log("🔄 Initial states load from localStorage:", saved);
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("❌ Failed to load states:", e);
-      return [];
+      // Save to localStorage first (always works)
+      localStorage.setItem("montra_wallets", JSON.stringify(walletsRef.current));
+      
+      // Try to save to Supabase user_data table
+      const { error } = await supabase
+        .from("user_data")
+        .upsert({
+          user_id: user.id,
+          wallets: walletsRef.current,
+          transactions: transactionsRef.current,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
+        
+      if (error) {
+        console.error("❌ Supabase save error:", error.message);
+        console.error("Error code:", error.code);
+        console.error("Error details:", error);
+      } else {
+        console.log("✅ Data saved to Supabase");
+      }
+    } catch (error) {
+      console.error("❌ Exception during save:", error.message);
     }
-  });
+  };
+
+  const saveTransactionsToDatabase = async () => {
+    if (!user) return;
+    
+    try {
+      // Save to localStorage first
+      localStorage.setItem("montra_transactions", JSON.stringify(transactionsRef.current));
+      
+      // Try to save to Supabase user_data table
+      const { error } = await supabase
+        .from("user_data")
+        .upsert({
+          user_id: user.id,
+          wallets: walletsRef.current,
+          transactions: transactionsRef.current,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
+        
+      if (error) {
+        console.error("❌ Supabase save error:", error.message);
+        console.error("Error code:", error.code);
+        console.error("Error details:", error);
+      } else {
+        console.log("✅ Transactions saved to Supabase");
+      }
+    } catch (error) {
+      console.error("❌ Exception during save:", error.message);
+    }
+  };
+
+  const saveStatesToDatabase = async () => {
+    try {
+      // Save saved_states to localStorage only (not user-specific)
+      localStorage.setItem("montra_saved_states", JSON.stringify(savedStatesRef.current));
+      console.log("✅ States saved to localStorage");
+    } catch (error) {
+      console.warn("⚠️ Error saving states:", error.message);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading) {
+      const debounceSave = setTimeout(() => {
+        saveWalletsToDatabase();
+      }, 500);
+      return () => clearTimeout(debounceSave);
+    }
+  }, [wallets, loading]);
+
+  useEffect(() => {
+    if (!loading) {
+      const debounceSave = setTimeout(() => {
+        saveTransactionsToDatabase();
+      }, 500);
+      return () => clearTimeout(debounceSave);
+    }
+  }, [transactions, loading]);
+
+  useEffect(() => {
+    if (!loading) {
+      const debounceSave = setTimeout(() => {
+        saveStatesToDatabase();
+      }, 500);
+      return () => clearTimeout(debounceSave);
+    }
+  }, [savedStates, loading]);
 
   const [showBalances, setShowBalances] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -356,79 +497,62 @@ const WalletTracker = () => {
   const [confirmModal, setConfirmModal] = useState({ show: false, action: null, targetId: null, message: "", title: "" });
   const [showEditOverlay, setShowEditOverlay] = useState(null);
   const [showTransferOverlay, setShowTransferOverlay] = useState(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [transferAmount, setTransferAmount] = useState("");
   const [transferToWallet, setTransferToWallet] = useState(null);
   const [draggedWallet, setDraggedWallet] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [touchY, setTouchY] = useState(0);
+  const [settingsTab, setSettingsTab] = useState("profile");
 
   const icons = ["💳", "🏦", "💵", "💰", "📱", "🎯", "💎", "🏪", "🎨", "⭐"];
 
-  // Save to localStorage IMMEDIATELY whenever wallets change
-  useEffect(() => {
-    try {
-      localStorage.setItem("montra_wallets", JSON.stringify(wallets));
-      console.log("✅ Wallets saved to localStorage:", wallets.length, "items");
-    } catch (e) {
-      console.error("❌ Failed to save wallets:", e);
-    }
-  }, [wallets]);
+  // Custom notification state
+  const [notification, setNotification] = useState({ show: false, type: "success", title: "", message: "" });
 
-  // Save to localStorage IMMEDIATELY whenever transactions change
-  useEffect(() => {
-    try {
-      localStorage.setItem("montra_transactions", JSON.stringify(transactions));
-      console.log("✅ Transactions saved to localStorage:", transactions.length, "items");
-    } catch (e) {
-      console.error("❌ Failed to save transactions:", e);
-    }
-  }, [transactions]);
+  // Helper function to show notifications
+  const showNotification = (type, title, message) => {
+    setNotification({ show: true, type, title, message });
+    setTimeout(() => {
+      setNotification({ show: false, type: "success", title: "", message: "" });
+    }, 4000);
+  };
 
-  // Save to localStorage IMMEDIATELY whenever states change
+  // Scroll lock effect for modals and overlays
   useEffect(() => {
-    try {
-      localStorage.setItem("montra_savedStates", JSON.stringify(savedStates));
-      console.log("✅ States saved to localStorage:", savedStates.length, "items");
-    } catch (e) {
-      console.error("❌ Failed to save states:", e);
-    }
-  }, [savedStates]);
+    const isAnyModalOpen = 
+      showAddModal || 
+      showSaveLoadModal || 
+      showEditOverlay || 
+      showTransferOverlay || 
+      showSettingsModal || 
+      confirmModal.show || 
+      sidebarOpen;
 
-  // Disable body scroll when modal or sidebar is open on mobile
-  useEffect(() => {
-    if (showAddModal || showSaveLoadModal || showEditOverlay || showTransferOverlay || confirmModal.show || sidebarOpen) {
-      document.body.style.overflow = "hidden";
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = "auto";
+      document.body.style.overflow = 'unset';
     }
+
+    // Cleanup on unmount
     return () => {
-      document.body.style.overflow = "auto";
+      document.body.style.overflow = 'unset';
     };
-  }, [showAddModal, showSaveLoadModal, showEditOverlay, showTransferOverlay, confirmModal.show, sidebarOpen]);
+  }, [showAddModal, showSaveLoadModal, showEditOverlay, showTransferOverlay, showSettingsModal, confirmModal.show, sidebarOpen]);
 
   // Debug function
   const debugStorage = () => {
-    // eslint-disable-next-line no-unused-vars
-    const walletsData = localStorage.getItem("montra_wallets");
-    // eslint-disable-next-line no-unused-vars
-    const transactionsData = localStorage.getItem("montra_transactions");
-    // eslint-disable-next-line no-unused-vars
-    const statesData = localStorage.getItem("montra_savedStates");
-    
     console.log("📊 === STORAGE DEBUG ===");
-    console.log("📊 Raw wallets in localStorage:", walletsData);
-    console.log("📊 Raw transactions in localStorage:", transactionsData);
-    console.log("📊 Raw states in localStorage:", statesData);
     console.log("📊 Current state wallets:", wallets);
     console.log("📊 Current state transactions:", transactions);
     console.log("📊 Current state savedStates:", savedStates);
-    
-    alert(`📊 STORAGE DEBUG:\n\nWallets: ${wallets.length} items\nTransactions: ${transactions.length} items\nStates: ${savedStates.length} items\n\n✅ Check console (F12) for detailed info`);
+    showNotification("info", "Storage Debug", `📊 STORAGE DEBUG:\n\nWallets: ${wallets.length} items\nTransactions: ${transactions.length} items\nStates: ${savedStates.length} items\n\n✅ Check console (F12) for detailed info`);
   };
 
   // Calculate unfrozen wallets and totals
   const getUnfrozenWallets = () => wallets.filter(w => !w.frozen);
-  const totalNetWorth = getUnfrozenWallets().reduce((sum, wallet) => sum + wallet.balance, 0);
+  const totalNetWorth = wallets.reduce((sum, wallet) => sum + wallet.balance, 0);
   
   const getFilteredWallets = () => {
     const unfrozen = getUnfrozenWallets();
@@ -468,6 +592,7 @@ const WalletTracker = () => {
         amount: wallet.balance,
         date: new Date().toISOString(),
       }]);
+      showNotification("info", "Account Added", `Account "${wallet.name}" added successfully.`);
     }
   };
 
@@ -485,16 +610,19 @@ const WalletTracker = () => {
     }
     setWallets(wallets.filter((w) => w.id !== id));
     setConfirmModal({ show: false, action: null, targetId: null, message: "", title: "" });
+    showNotification("error", "Account Deleted", `Account "${walletToDelete.name}" deleted successfully.`);
   };
 
   const handleDeleteTransaction = (id) => {
     setTransactions(transactions.filter(t => t.id !== id));
     setConfirmModal({ show: false, action: null, targetId: null, message: "", title: "" });
+    showNotification("error", "Transaction Deleted", "Transaction deleted successfully.");
   };
 
   const handleRemoveAllTransactions = () => {
     setTransactions([]);
     setConfirmModal({ show: false, action: null, targetId: null, message: "", title: "" });
+    showNotification("error", "All Transactions Removed", "All transaction records have been removed.");
   };
 
   const handleUpdateBalance = (id, newBalance) => {
@@ -513,6 +641,7 @@ const WalletTracker = () => {
     }
     setWallets(wallets.map((w) => w.id === id ? { ...w, balance: parseFloat(newBalance) || 0 } : w));
     setEditingWallet(null);
+    showNotification("info", "Balance Updated", `Balance for "${walletToUpdate.name}" updated successfully.`);
   };
 
   const handleSaveState = () => {
@@ -527,6 +656,7 @@ const WalletTracker = () => {
       const updatedStates = [...savedStates, newState];
       setSavedStates(updatedStates);
       setStateName("");
+      showNotification("info", "State Saved", `State "${stateName}" saved successfully.`);
     }
   };
 
@@ -536,11 +666,13 @@ const WalletTracker = () => {
       setTransactions(state.transactions);
     }
     setShowSaveLoadModal(false);
+    showNotification("info", "State Loaded", `State "${state.name}" loaded successfully.`);
   };
 
   const handleDeleteState = (id) => {
     const updatedStates = savedStates.filter((s) => s.id !== id);
     setSavedStates(updatedStates);
+    showNotification("info", "State Deleted", "State deleted successfully.");
   };
 
   const handleExportData = () => {
@@ -552,6 +684,7 @@ const WalletTracker = () => {
     a.download = `montra-backup-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    showNotification("info", "Data Exported", "Data exported successfully.");
   };
 
   const handleImportData = (e) => {
@@ -567,8 +700,9 @@ const WalletTracker = () => {
           if (data.transactions) {
             setTransactions(data.transactions);
           }
+          showNotification("info", "Data Imported", "Data imported successfully.");
         } catch (error) {
-          alert("Invalid file format");
+          showNotification("error", "Import Failed", "Invalid file format.");
         }
       };
       reader.readAsText(file);
@@ -590,16 +724,19 @@ const WalletTracker = () => {
     const pinnedCount = wallets.filter(w => w.pinned && !w.frozen).length;
     
     if (!wallet.pinned && pinnedCount >= 3) {
+      showNotification("error", "Pin Limit Reached", "You can only pin up to 3 accounts.");
       return;
     }
     
     if (!wallet.pinned) {
       const newWallets = wallets.filter(w => w.id !== id);
       setWallets([{ ...wallet, pinned: true }, ...newWallets]);
+      showNotification("info", "Account Pinned", `Account "${wallet.name}" pinned to dashboard.`);
     } else {
       setWallets(wallets.map(w => 
         w.id === id ? { ...w, pinned: false } : w
       ));
+      showNotification("info", "Account Unpinned", `Account "${wallet.name}" unpinned from dashboard.`);
     }
   };
 
@@ -607,18 +744,21 @@ const WalletTracker = () => {
     setWallets(wallets.map(w => 
       w.id === id ? { ...w, frozen: !w.frozen } : w
     ));
+    const wallet = wallets.find(w => w.id === id);
+    showNotification("info", wallet.frozen ? "Account Unfrozen" : "Account Frozen", `Account "${wallet.name}" ${wallet.frozen ? "unfrozen" : "frozen"} successfully.`);
   };
 
   const updateWalletProperties = (id, updates) => {
     setWallets(wallets.map(w => 
       w.id === id ? { ...w, ...updates } : w
     ));
+    showNotification("info", "Account Updated", "Account properties updated successfully.");
   };
 
   const handleTransferFunds = (fromId, toId, amount) => {
     const amountNum = parseFloat(amount);
     if (amountNum <= 0) {
-      alert("Transfer amount must be greater than 0");
+      showNotification("error", "Invalid Amount", "Transfer amount must be greater than 0.");
       return;
     }
 
@@ -644,8 +784,9 @@ const WalletTracker = () => {
       setShowTransferOverlay(null);
       setTransferAmount("");
       setTransferToWallet(null);
+      showNotification("info", "Transfer Successful", `₱${amountNum.toLocaleString("en-US", {minimumFractionDigits: 2})} transferred from "${fromWallet.name}" to "${toWallet.name}".`);
     } else {
-      alert("Insufficient balance for transfer");
+      showNotification("error", "Insufficient Balance", "Insufficient balance for transfer.");
     }
   };
 
@@ -665,6 +806,30 @@ const WalletTracker = () => {
     { label: "Credit", value: "Credit", icon: "💵" },
     { label: "Investments", value: "Investments", icon: "📈" },
   ];
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#F1F3FF] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-6">
+          <div className="animate-bounce">
+            <img src="/logo.png" alt="Montra" className="w-16 h-16" />
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-semibold text-[#1E1E1E]">Loading</p>
+            <div className="flex gap-1 justify-center mt-2">
+              <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
+              <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+              <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-[#F1F3FF] flex">
@@ -761,7 +926,7 @@ const WalletTracker = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><Settings size={20} className="text-[#1E1E1E]" /></button>
+            <button onClick={() => setShowSettingsModal(true)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><Settings size={20} className="text-[#1E1E1E]" /></button>
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-gray-100 rounded-full">
               <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center cursor-pointer">
                 <User size={24} className="text-white" />
@@ -837,6 +1002,8 @@ const WalletTracker = () => {
                     </div>
                     {wallets.length === 0 ? (
                       <p className="text-center text-gray-400 py-8">No accounts yet</p>
+                    ) : getPinnedWallets().length === 0 ? (
+                      <p className="text-center text-gray-400 py-8">Pin accounts in the accounts tab to quickly view them in the dashboard</p>
                     ) : (
                       <div className="grid grid-cols-2 gap-4">
                         {getPinnedWallets().map((wallet) => (
@@ -854,8 +1021,8 @@ const WalletTracker = () => {
                             <p className="text-lg font-bold text-[#1E1E1E]">{showBalances ? `₱${wallet.balance.toLocaleString("en-US", {minimumFractionDigits: 2})}` : "₱••••"}</p>
                           </div>
                         ))}
-                        {wallets.length > 3 && (
-                          <button onClick={() => setActiveTab("accounts")} className="flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 rounded-xl p-4 hover:bg-indigo-50">
+                        {getPinnedWallets().length === 3 && wallets.length > 3 && (
+                          <button onClick={() => setActiveTab("accounts")} className="flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 rounded-xl p-4 hover:bg-indigo-50 bg-white">
                             <span className="text-indigo-600 font-semibold">View All</span>
                           </button>
                         )}
@@ -1383,18 +1550,16 @@ const WalletTracker = () => {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Transfer To</label>
-                      <select
-                        value={transferToWallet || ""}
-                        onChange={(e) => setTransferToWallet(parseInt(e.target.value))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="">Select destination account</option>
-                        {wallets.filter(w => w.id !== showEditOverlay && !w.frozen).map((w) => (
-                          <option key={w.id} value={w.id}>
-                            {w.icon} {w.name}
-                          </option>
-                        ))}
-                      </select>
+                      <CustomDropdown
+                        options={wallets.filter(w => w.id !== showEditOverlay && !w.frozen).map((w) => ({
+                          label: `${w.icon} ${w.name}`,
+                          value: w.id,
+                          icon: w.icon
+                        }))}
+                        value={transferToWallet}
+                        onChange={(value) => setTransferToWallet(value)}
+                        placeholder="Select destination account"
+                      />
                     </div>
 
                     <div>
@@ -1416,7 +1581,7 @@ const WalletTracker = () => {
                         if (transferToWallet && transferAmount) {
                           handleTransferFunds(showEditOverlay, transferToWallet, transferAmount);
                         } else {
-                          alert("Please select destination and enter amount");
+                          showNotification("error", "Transfer Failed", "Please select destination and enter amount.");
                         }
                       }}
                       className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-all flex items-center justify-center gap-2"
@@ -1518,18 +1683,16 @@ const WalletTracker = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-[#1E1E1E] mb-2">Transfer To</label>
-                  <select
-                    value={transferToWallet || ""}
-                    onChange={(e) => setTransferToWallet(parseInt(e.target.value))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select destination account</option>
-                    {wallets.filter(w => w.id !== showTransferOverlay && !w.frozen).map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.icon} {w.name}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomDropdown
+                    options={wallets.filter(w => w.id !== showTransferOverlay && !w.frozen).map((w) => ({
+                      label: `${w.icon} ${w.name}`,
+                      value: w.id,
+                      icon: w.icon
+                    }))}
+                    value={transferToWallet}
+                    onChange={(value) => setTransferToWallet(value)}
+                    placeholder="Select destination account"
+                  />
                 </div>
 
                 <div>
@@ -1551,7 +1714,7 @@ const WalletTracker = () => {
                     if (transferToWallet && transferAmount) {
                       handleTransferFunds(showTransferOverlay, transferToWallet, transferAmount);
                     } else {
-                      alert("Please select destination and enter amount");
+                      showNotification("error", "Transfer Failed", "Please select destination and enter amount.");
                     }
                   }}
                   className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-all flex items-center justify-center gap-2"
@@ -1568,6 +1731,221 @@ const WalletTracker = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden animate-scaleIn flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center p-8 border-b border-gray-200">
+              <h3 className="text-2xl font-bold text-[#1E1E1E]">Settings</h3>
+              <button onClick={() => setShowSettingsModal(false)} className="p-2 hover:bg-gray-100 rounded"><X size={24} /></button>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex border-b border-gray-200 px-8">
+              <button
+                onClick={() => setSettingsTab("profile")}
+                className={`px-4 py-4 font-semibold text-sm transition-all border-b-2 ${
+                  settingsTab === "profile"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Profile
+              </button>
+              <button
+                onClick={() => setSettingsTab("debug")}
+                className={`px-4 py-4 font-semibold text-sm transition-all border-b-2 ${
+                  settingsTab === "debug"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Debug
+              </button>
+              <button
+                onClick={() => setSettingsTab("security")}
+                className={`px-4 py-4 font-semibold text-sm transition-all border-b-2 ${
+                  settingsTab === "security"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Security
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-8">
+              {/* Profile Tab */}
+              {settingsTab === "profile" && (
+                <div className="space-y-6 animate-fadeIn">
+                  <div>
+                    <h4 className="text-lg font-semibold text-[#1E1E1E] mb-4">👤 Profile Information</h4>
+                    
+                    {/* Avatar Upload */}
+                    <div className="flex flex-col items-center gap-4 mb-6">
+                      <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center">
+                        <User size={40} className="text-indigo-600" />
+                      </div>
+                      <label className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-all text-sm cursor-pointer">
+                        Upload Avatar
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                localStorage.setItem("userAvatar", event.target.result);
+                                showNotification("info", "Avatar Updated", "Avatar updated successfully.");
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Username */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                      <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed">
+                        {user?.email?.split('@')[0] || 'User'}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Username cannot be changed</p>
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                      <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed">
+                        {user?.email || 'No email'}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Email used during registration</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Debug Tab */}
+              {settingsTab === "debug" && (
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Storage Status */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-[#1E1E1E] mb-3">💾 Storage Status</h4>
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-2 text-sm">
+                      <p className="text-gray-600"><span className="font-medium">Wallets:</span> {wallets.length} accounts</p>
+                      <p className="text-gray-600"><span className="font-medium">Transactions:</span> {transactions.length} records</p>
+                      <p className="text-gray-600"><span className="font-medium">Saved States:</span> {savedStates.length} snapshots</p>
+                      <p className="text-green-600 mt-3 text-xs">✅ Data is automatically saved to Supabase</p>
+                    </div>
+                  </div>
+
+                  {/* Debug Tools */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-[#1E1E1E] mb-3">🔍 Debug Tools</h4>
+                    <div className="space-y-2">
+                      <button 
+                        onClick={() => {
+                          saveWalletsToDatabase();
+                          saveTransactionsToDatabase();
+                          showNotification("info", "Data Saved", "Data manually saved to Supabase.");
+                        }}
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-all text-sm"
+                      >
+                        Save to Supabase
+                      </button>
+                      <button 
+                        onClick={() => {
+                          console.log("📊 FULL DEBUG INFO:");
+                          console.log("Wallets:", wallets);
+                          console.log("Transactions:", transactions);
+                          console.log("Saved States:", savedStates);
+                          console.log("User:", user);
+                          showNotification("info", "Debug Info", "Debug info logged to console (F12).");
+                        }}
+                        className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-all text-sm"
+                      >
+                        Log Debug Info to Console
+                      </button>
+                      <button 
+                        onClick={debugStorage}
+                        className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold transition-all text-sm"
+                      >
+                        Show Storage Summary
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Security Tab */}
+              {settingsTab === "security" && (
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Password Section */}
+                  <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
+                    <h4 className="text-lg font-semibold text-orange-600 mb-3">🔑 Password</h4>
+                    <button
+                      onClick={() => {
+                        setShowSettingsModal(false);
+                        // Navigate to password reset page
+                        window.location.href = '/password-reset';
+                      }}
+                      className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold transition-all text-sm"
+                    >
+                      Forgot Password
+                    </button>
+                    <p className="text-xs text-orange-600 mt-2">Forgot your password? We'll send you a reset link via email.</p>
+                  </div>
+
+                  {/* Delete Account Section */}
+                  <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                    <h4 className="text-lg font-semibold text-red-600 mb-3">⚠️ Delete Account</h4>
+                    <button
+                      onClick={() => {
+                        setShowSettingsModal(false);
+                        // Navigate to account deletion page
+                        window.location.href = '/account-deletion';
+                      }}
+                      className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all text-sm"
+                    >
+                      Delete Account
+                    </button>
+                    <p className="text-xs text-red-600 mt-2">Permanently delete your account and all associated data. This action cannot be undone.</p>
+                  </div>
+
+                  {/* Sign Out Section */}
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <h4 className="text-lg font-semibold text-[#1E1E1E] mb-3">🚪 Session</h4>
+                    <button
+                      onClick={async () => {
+                        await supabase.auth.signOut();
+                        setShowSettingsModal(false);
+                      }}
+                      className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-all text-sm"
+                    >
+                      Sign Out
+                    </button>
+                    <p className="text-xs text-gray-600 mt-2">Log out from your current session.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Overlay */}
+      {notification.show && (
+        <div className={`fixed bottom-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white ${notification.type === "success" ? "bg-green-600" : notification.type === "error" ? "bg-red-600" : "bg-blue-600"} animate-fadeIn`}>
+          <h4 className="font-bold mb-1">{notification.title}</h4>
+          <p>{notification.message}</p>
         </div>
       )}
     </div>
